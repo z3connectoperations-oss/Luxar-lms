@@ -1,4 +1,4 @@
-export const BASE = import.meta.env.VITE_API_URL || "http://localhost:8787";
+export const BASE = import.meta.env.DEV ? "http://localhost:8787" : "https://luxar-api.luxaarinstitute.workers.dev";
 const TOKEN_KEY = "luxar_token";
 
 /** Session token (also stored as a cookie, but Pages↔Worker are different domains

@@ -4,8 +4,8 @@ compatibility_date = "2025-01-01"
 
 # Production web origin (Cloudflare Pages). CORS also allows any *.pages.dev + localhost.
 [vars]
-WEB_ORIGIN = "https://luxar-lms.pages.dev"
-FIREBASE_PROJECT_ID = "luxar-lms"
+WEB_ORIGIN = "https://luxar-lms-2go.pages.dev"
+FIREBASE_PROJECT_ID = "luxar-firebase"
 
 # Cron: send class-starting-soon reminders every 15 minutes.
 [triggers]
