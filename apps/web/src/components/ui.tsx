@@ -79,7 +79,7 @@ export function Label({ children }: { children: ReactNode }) {
 }
 
 type Tone = "pink" | "yellow" | "blue" | "brand" | "neutral" | "success" | "warning" | "danger";
-export function Chip({ children, tone = "brand" }: { children: ReactNode; tone?: Tone }) {
+export function Chip({ children, tone = "brand", className }: { children: ReactNode; tone?: Tone; className?: string }) {
   const tones: Record<Tone, string> = {
     brand: "bg-gold-50 text-gold-700 ring-1 ring-gold-200",
     pink: "bg-gold-50 text-gold-700 ring-1 ring-gold-200",
@@ -91,7 +91,7 @@ export function Chip({ children, tone = "brand" }: { children: ReactNode; tone?:
     danger: "bg-red-50 text-red-700 ring-1 ring-red-200",
   };
   return (
-    <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium", tones[tone])}>
+    <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium", tones[tone], className)}>
       {children}
     </span>
   );

@@ -20,6 +20,7 @@ import {
   enrollments,
   orders,
   orderItems,
+  leads,
 } from "@luxar/db";
 import { requireRole } from "../middleware";
 import type { AppEnv } from "../types";
@@ -58,6 +59,12 @@ admin.get("/stats", async (c) => {
     trainers: trainerCount,
     variants: orderCount,
   });
+});
+
+// ---- Leads / Enquiries ----------------------------------------------------
+admin.get("/leads", async (c) => {
+  const list = await c.get("db").select().from(leads).orderBy(desc(leads.createdAt)).all();
+  return c.json({ leads: list });
 });
 
 // ---- Exams ----------------------------------------------------------------

@@ -37,7 +37,7 @@ export default function CourseCard(c: CourseCardData) {
 
   return (
     <Link to={href} className="group block">
-      <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-white shadow-card transition-all duration-300 hover:-translate-y-1 hover:border-gold-400 hover:shadow-soft">
+      <div className="flex h-full flex-col overflow-hidden rounded-3xl border border-border bg-white shadow-card transition-all duration-300 hover:-translate-y-2 hover:border-gold-400 hover:shadow-lux">
         {/* Cover */}
         <div className="relative h-48 overflow-hidden bg-gold-50">
           {showImg ? (
@@ -55,13 +55,13 @@ export default function CourseCard(c: CourseCardData) {
           )}
         </div>
 
-        <div className="flex flex-1 flex-col space-y-4 p-6">
+        <div className="flex flex-1 flex-col space-y-4 p-8">
           {c.exam && (
-            <span className="self-start rounded-full bg-gold-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-gold-700 ring-1 ring-gold-200">
+            <span className="self-start rounded-full bg-gold-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-gold-700 ring-1 ring-gold-200">
               {c.exam}
             </span>
           )}
-          <h3 className="font-display text-lg font-semibold leading-snug text-ink">{c.title}</h3>
+          <h3 className="font-display text-xl font-bold leading-snug text-ink">{c.title}</h3>
           {c.summary && <p className="line-clamp-2 flex-grow text-sm leading-relaxed text-muted">{c.summary}</p>}
 
           {c.progress !== undefined ? (

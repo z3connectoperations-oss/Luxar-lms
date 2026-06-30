@@ -8,6 +8,7 @@ import Signup from "./pages/Signup";
 import Courses from "./pages/Courses";
 import CourseDetail from "./pages/CourseDetail";
 import About from "./pages/About";
+import Contact from "./pages/Contact";
 import { StudentDashboard, TrainerDashboard } from "./pages/dashboards";
 import MyCourses from "./pages/student/MyCourses";
 import Pathway from "./pages/student/Pathway";
@@ -37,7 +38,7 @@ import AdminCourseEdit from "./pages/admin/CourseEdit";
 import AdminUsers from "./pages/admin/Users";
 import AdminEnrollments from "./pages/admin/Enrollments";
 import AdminEnrollmentDetail from "./pages/admin/EnrollmentDetail";
-import AdminCms from "./pages/admin/Cms";
+import AdminLeads from "./pages/admin/Leads";
 import AdminExams from "./pages/admin/Exams";
 
 export default function App() {
@@ -51,6 +52,7 @@ export default function App() {
             <Route path="/courses" element={<Courses />} />
             <Route path="/courses/:slug" element={<CourseDetail />} />
             <Route path="/about" element={<About />} />
+            <Route path="/contact" element={<Contact />} />
           </Route>
           <Route path="/login" element={<Navigate to="/?login=true" replace />} />
           <Route path="/signup" element={<Signup />} />
@@ -118,7 +120,7 @@ export default function App() {
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/enrollments" element={<AdminEnrollments />} />
             <Route path="/admin/enrollments/:courseId" element={<AdminEnrollmentDetail />} />
-            <Route path="/admin/cms" element={<AdminCms />} />
+            <Route path="/admin/leads" element={<AdminLeads />} />
             <Route path="/admin/notifications" element={<Notifications />} />
           </Route>
 

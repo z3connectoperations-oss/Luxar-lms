@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   Clock, BarChart3, User, BadgeCheck, FileDown, ChevronRight, ChevronDown,
   PlayCircle, FileText, ClipboardCheck, Radio, Lock, Award, Layers, BookOpen,
-  ShieldCheck, Infinity as InfinityIcon, Sparkles, GraduationCap,
+  ShieldCheck, Infinity as InfinityIcon, Sparkles, GraduationCap, LucideIcon
 } from "lucide-react";
 import { api } from "../lib/api";
 import { mediaUrl } from "../lib/media";
@@ -417,7 +417,7 @@ function SectionCard({
   );
 }
 
-function Include({ Icon, text }: { Icon: React.ComponentType<{ size?: number; className?: string }>; text: string }) {
+function Include({ Icon, text }: { Icon: LucideIcon; text: string }) {
   return (
     <li className="flex items-center gap-3">
       <Icon size={17} className="shrink-0 text-brand-600" />

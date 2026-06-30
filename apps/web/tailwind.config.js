@@ -85,6 +85,8 @@ export default {
         scroll: "scroll 45s linear infinite",
         "fade-in-up": "fadeInUp 0.6s ease-out both",
         "count-up": "countUp 0.5s ease-out both",
+        glow: "glow 3s ease-in-out infinite",
+        mesh: "mesh 20s linear infinite",
       },
     },
   },

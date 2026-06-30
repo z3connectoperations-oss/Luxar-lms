@@ -34,7 +34,7 @@ const NAV: Record<string, Item[]> = {
     { label: "Courses", to: "/admin/courses", icon: BookOpen },
     { label: "Users", to: "/admin/users", icon: Users },
     { label: "Enrolled Courses", to: "/admin/enrollments", icon: GraduationCap },
-    { label: "Website (CMS)", to: "/admin/cms", icon: Globe },
+    { label: "Leads", to: "/admin/leads", icon: MessageSquare },
   ],
 };
 
@@ -85,11 +85,11 @@ export default function PortalLayout({ scope }: { scope: "student" | "trainer" |
       <div className="flex h-full flex-col bg-canvas">
         {/* White top nav with minimal shadow */}
         <header className="sticky top-0 z-30 border-b border-border bg-white shadow-card">
-          <div className="mx-auto flex h-14 max-w-content items-center gap-5 px-5">
+          <div className="mx-auto flex h-14 max-w-content items-center gap-3 px-3 sm:gap-5 sm:px-5">
             {/* Brand */}
             <Link to="/" className="flex shrink-0 items-center gap-2">
               <img src="/luxaar.png" alt="Luxaar Institute" className="h-8 w-8 rounded-lg object-cover ring-1 ring-ink/10" />
-              <span className="font-display text-base font-bold text-ink">Luxaar Institute</span>
+              <span className="hidden sm:block font-display text-base font-bold text-ink">Luxaar Institute</span>
               {!online && (
                 <span className="hidden text-[11px] text-faint sm:inline">Offline</span>
               )}
@@ -246,16 +246,16 @@ export default function PortalLayout({ scope }: { scope: "student" | "trainer" |
             >
               <Menu size={20} />
             </button>
-            <Link to="/" className="flex items-center gap-2">
-              <img src="/luxaar.png" alt="Luxaar Institute" className="h-8 w-8 rounded-lg object-cover ring-1 ring-ink/10" />
-              <span className="font-display text-base font-bold text-ink">Luxaar Institute</span>
+            <Link to="/" className="flex items-center gap-2 overflow-hidden">
+              <img src="/luxaar.png" alt="Luxaar Institute" className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg object-cover ring-1 ring-ink/10 shrink-0" />
+              <span className="font-display text-sm sm:text-base font-bold text-ink whitespace-nowrap truncate">Luxaar Institute</span>
             </Link>
             <span className="text-[10px] font-semibold text-gold-700 bg-gold-50 px-2 py-0.5 rounded-full capitalize">
               {scope}
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <Link
               to={`/${scope}/notifications`}
               className="relative grid h-8 w-8 place-items-center rounded-md text-muted transition hover:bg-gold-50 hover:text-ink"
@@ -267,7 +267,7 @@ export default function PortalLayout({ scope }: { scope: "student" | "trainer" |
                 </span>
               )}
             </Link>
-            <span className="grid h-8 w-8 place-items-center rounded-full bg-ink text-xs font-semibold text-white">
+            <span className="grid h-7 w-7 sm:h-8 sm:w-8 shrink-0 place-items-center rounded-full bg-ink text-xs font-semibold text-white">
               {initials}
             </span>
           </div>

@@ -16,7 +16,8 @@ import {
   LogOut,
   AlertCircle,
   ChevronDown,
-  Sparkles
+  Sparkles,
+  Menu
 } from "lucide-react";
 import { useAuth, homeForRole } from "../auth/AuthContext";
 import { api } from "../lib/api";
@@ -96,6 +97,7 @@ export default function PublicLayout() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isExploreOpen, setIsExploreOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Scroll state for floating navbar
   const [isScrolled, setIsScrolled] = useState(false);
@@ -229,6 +231,7 @@ export default function PublicLayout() {
   const handleLogout = async () => {
     await logout();
     setIsProfileOpen(false);
+    setIsMobileMenuOpen(false);
   };
 
   return (
@@ -241,8 +244,8 @@ export default function PublicLayout() {
         className={cn(
           "fixed top-0 left-1/2 z-50 -translate-x-1/2 transition-all duration-500 ease-in-out",
           isScrolled
-            ? "top-4 w-[95%] max-w-[1280px] rounded-full border border-white/40 bg-white/70 shadow-lux backdrop-blur-xl"
-            : "w-full max-w-none border-b border-border bg-white shadow-card"
+            ? "top-4 w-[95%] max-w-[1280px] rounded-full border border-white/40 glass shadow-lux"
+            : "w-full max-w-none border-b border-border bg-white/95 backdrop-blur-md shadow-card"
         )}
       >
         {/* Main header row */}
@@ -329,7 +332,7 @@ export default function PublicLayout() {
                     setIsLoginOpen(false);
                     setIsExploreOpen(false);
                   }}
-                  className="flex items-center gap-2 rounded-full border border-border bg-white p-1 pr-3 transition-all duration-200 hover:border-gold-400 cursor-pointer"
+                  className="hidden md:flex items-center gap-2 rounded-full border border-border bg-white p-1 pr-3 transition-all duration-200 hover:border-gold-400 cursor-pointer"
                 >
                   {user.avatarUrl ? (
                     <img src={user.avatarUrl} alt={user.name} className="h-8 w-8 rounded-full object-cover" />
@@ -344,14 +347,14 @@ export default function PublicLayout() {
                   <ChevronDown size={14} className="text-muted" />
                 </button>
               ) : (
-                <>
+                <div className="hidden md:flex items-center gap-4">
                   <button
                     onClick={() => {
                       setIsLoginOpen(true);
                       setIsProfileOpen(false);
                       setIsExploreOpen(false);
                     }}
-                    className="hidden whitespace-nowrap rounded-xl border border-ink bg-transparent px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-ink transition-all duration-200 hover:bg-ink hover:text-white sm:inline-flex"
+                    className="whitespace-nowrap rounded-xl border border-ink bg-transparent px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-ink transition-all duration-200 hover:bg-ink hover:text-white"
                   >
                     Login
                   </button>
@@ -359,12 +362,20 @@ export default function PublicLayout() {
                     to="/signup"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="whitespace-nowrap rounded-xl bg-ink px-6 py-2.5 text-xs font-semibold uppercase tracking-widest text-white shadow-soft transition-all duration-200 hover:bg-gold-300 hover:text-ink"
+                    className="whitespace-nowrap rounded-full bg-ink px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-white shadow-lux transition-all duration-300 hover:bg-gold-500 hover:text-ink hover:animate-glow hover:-translate-y-0.5"
                   >
                     Get Started
                   </Link>
-                </>
+                </div>
               )}
+
+              {/* Mobile menu toggle */}
+              <button
+                className="lg:hidden grid h-10 w-10 place-items-center rounded-full bg-white border border-border text-ink hover:bg-gold-50 hover:border-gold-400 transition"
+                onClick={() => setIsMobileMenuOpen(true)}
+              >
+                <Menu size={20} />
+              </button>
             </div>
           </div>
 
@@ -407,6 +418,107 @@ export default function PublicLayout() {
           </div>
         </div>
       </header>
+
+      {/* MOBILE NAVIGATION SIDEBAR */}
+      {/* Backdrop */}
+      <div
+        className={cn(
+          "fixed inset-0 z-50 bg-ink/50 backdrop-blur-xs transition-opacity duration-300 pointer-events-none opacity-0 lg:hidden",
+          isMobileMenuOpen && "pointer-events-auto opacity-100"
+        )}
+        onClick={() => setIsMobileMenuOpen(false)}
+      />
+      {/* Sidebar container */}
+      <div
+        className={cn(
+          "fixed right-0 top-0 z-50 flex h-full w-full max-w-xs flex-col overflow-y-auto border-l border-border bg-white shadow-2xl transition-transform duration-300 ease-in-out lg:hidden",
+          isMobileMenuOpen ? "translate-x-0" : "translate-x-full"
+        )}
+      >
+        <div className="flex h-16 items-center justify-between border-b border-border px-6">
+          <span className="font-display text-lg font-bold text-ink">Menu</span>
+          <button
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="rounded-lg p-2 text-muted transition hover:bg-gold-50 hover:text-ink"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="flex flex-1 flex-col p-6">
+          <nav className="space-y-4 flex-1">
+            <NavLink
+              to="/courses"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={({ isActive }) => cn("block text-lg font-semibold", isActive ? "text-gold-600" : "text-ink")}
+            >
+              Courses
+            </NavLink>
+            <NavLink
+              to="/about"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={({ isActive }) => cn("block text-lg font-semibold", isActive ? "text-gold-600" : "text-ink")}
+            >
+              About
+            </NavLink>
+            {user && (
+              <NavLink
+                to={homeForRole(user.role)}
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block text-lg font-semibold text-ink hover:text-gold-600"
+              >
+                My Dashboard
+              </NavLink>
+            )}
+          </nav>
+
+          <div className="mt-8 border-t border-border pt-8">
+            {user ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  {user.avatarUrl ? (
+                    <img src={user.avatarUrl} alt={user.name} className="h-10 w-10 rounded-full object-cover" />
+                  ) : (
+                    <div className="grid h-10 w-10 place-items-center rounded-full bg-ink text-sm font-bold uppercase text-white">
+                      {user.name ? user.name.slice(0, 2) : user.email.slice(0, 2)}
+                    </div>
+                  )}
+                  <div>
+                    <div className="font-semibold text-ink">{user.name || user.email.split("@")[0]}</div>
+                    <div className="text-xs text-muted">{user.email}</div>
+                  </div>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-border py-3 font-semibold text-ink hover:bg-red-50 hover:text-red-600 hover:border-red-200"
+                >
+                  <LogOut size={18} />
+                  Log Out
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    setIsLoginOpen(true);
+                  }}
+                  className="w-full rounded-xl border border-ink py-3 font-semibold uppercase tracking-widest text-ink transition hover:bg-ink hover:text-white"
+                >
+                  Login
+                </button>
+                <Link
+                  to="/signup"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex w-full justify-center rounded-xl bg-ink py-3 font-semibold uppercase tracking-widest text-white shadow-lux transition hover:bg-gold-500 hover:text-ink"
+                >
+                  Get Started
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* LOGIN SIDEBAR */}
       {/* Backdrop overlay */}
@@ -631,10 +743,11 @@ function Footer() {
     { h: "Exams", items: [["TNPSC AE Civil", "/courses?exam=TNPSC%20AE%20Civil"], ["UPSC", "/courses?exam=UPSC"], ["Banking", "/courses?exam=Banking"], ["GATE (Civil)", "/courses?exam=GATE%20(Civil)"], ["NEET", "/courses?exam=NEET"]] },
   ];
   return (
-    <footer className="border-t-2 border-gold-500 bg-white pb-10 pt-16">
+    <footer className="bg-ink pb-10 pt-16 text-white border-t border-white/10">
       <div className="mx-auto max-w-content px-6 lg:px-10">
         {/* Newsletter band */}
-        <div className="mb-14 grid items-center gap-6 rounded-2xl bg-ink p-8 md:grid-cols-2 md:p-10">
+        <div className="mb-14 grid items-center gap-6 rounded-3xl bg-neutral-900 border border-white/10 p-8 shadow-lux md:grid-cols-2 md:p-10 relative overflow-hidden">
+          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-gold-500/10 blur-3xl"></div>
           <div>
             <h3 className="font-display text-2xl font-bold tracking-tight text-white">Subscribe to our newsletter</h3>
             <p className="mt-1 text-white/65">Weekly current affairs, exam updates and new course drops.</p>
@@ -646,7 +759,7 @@ function Footer() {
               <input
                 type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
-                className="h-12 flex-grow rounded-xl border-0 bg-white px-5 text-sm text-ink outline-none transition placeholder:text-faint focus:ring-4 focus:ring-gold-500/30"
+                className="h-12 flex-grow rounded-xl border border-white/20 bg-white/5 px-5 text-sm text-white outline-none transition placeholder:text-white/40 focus:border-gold-500 focus:bg-white/10 focus:ring-4 focus:ring-gold-500/20"
               />
               <button type="submit" className="h-12 rounded-xl bg-gold-500 px-8 text-xs font-semibold uppercase tracking-widest text-white transition-all duration-200 hover:bg-gold-300 hover:text-ink">Subscribe</button>
             </form>
@@ -657,15 +770,15 @@ function Footer() {
         <div className="mb-12 grid grid-cols-2 gap-10 lg:grid-cols-4">
           <div className="col-span-2 lg:col-span-1">
             <div className="flex items-center gap-2.5">
-              <img src="/luxaar.png" alt="Luxaar Institute" className="h-10 w-10 object-cover ring-1 ring-ink/10" />
-              <div className="font-display text-xl font-bold tracking-tighter text-ink">Luxaar Institute</div>
+              <img src="/luxaar.png" alt="Luxaar Institute" className="h-10 w-10 object-cover ring-1 ring-white/20 rounded-xl" />
+              <div className="font-display text-2xl font-extrabold tracking-tighter text-white">Luxaar Institute</div>
             </div>
-            <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted">
+            <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/60">
               © {new Date().getFullYear()} Luxaar Institute. India's focused platform for competitive exam preparation — education that inspires every aspirant.
             </p>
             <div className="mt-5 flex gap-4">
               {[Globe, Share2, AtSign].map((Icon, i) => (
-                <span key={i} className="cursor-pointer text-muted transition hover:text-gold-600">
+                <span key={i} className="cursor-pointer text-white/50 transition hover:text-gold-400">
                   <Icon size={18} />
                 </span>
               ))}
@@ -673,30 +786,30 @@ function Footer() {
           </div>
           {linkCols.map((col) => (
             <div key={col.h}>
-              <h4 className="text-xs font-bold uppercase tracking-widest text-ink">{col.h}</h4>
+              <h4 className="text-xs font-bold uppercase tracking-widest text-gold-400">{col.h}</h4>
               <ul className="mt-5 space-y-3 text-sm">
                 {col.items.map(([label, to]) => (
-                  <li key={label}><Link to={to} className="text-muted underline-offset-4 transition hover:text-gold-600 hover:underline hover:decoration-2">{label}</Link></li>
+                  <li key={label}><Link to={to} className="text-white/60 underline-offset-4 transition hover:text-gold-400 hover:underline hover:decoration-2">{label}</Link></li>
                 ))}
               </ul>
             </div>
           ))}
           <div>
-            <h4 className="text-xs font-bold uppercase tracking-widest text-ink">Contact</h4>
-            <ul className="mt-5 space-y-3 text-sm text-muted">
-              <li className="flex items-center gap-2"><Mail size={16} className="text-gold-500" /> support@luxarlms.in</li>
-              <li className="flex items-center gap-2"><Phone size={16} className="text-gold-500" /> +91 99999 00000</li>
-              <li className="flex items-start gap-2"><MapPin size={16} className="mt-0.5 shrink-0 text-gold-500" /> New Delhi, India</li>
+            <h4 className="text-xs font-bold uppercase tracking-widest text-gold-400">Contact</h4>
+            <ul className="mt-5 space-y-3 text-sm text-white/60">
+              <li className="flex items-center gap-2"><Mail size={16} className="text-gold-400" /> luxaarinstitute@gmail.com</li>
+              <li className="flex items-center gap-2"><Phone size={16} className="text-gold-400" /> +91 9443241572</li>
+              <li className="flex items-start gap-2"><MapPin size={16} className="mt-0.5 shrink-0 text-gold-400" /> Kanyakumari, Tamilnadu</li>
             </ul>
           </div>
         </div>
 
-        <div className="flex flex-col items-center justify-between gap-4 border-t border-border pt-8 sm:flex-row">
-          <p className="text-sm text-muted">© {new Date().getFullYear()} Luxaar Institute. All rights reserved.</p>
-          <div className="flex gap-6 text-sm text-muted">
-            <Link to="/about" className="underline-offset-4 hover:text-ink hover:underline">Privacy Policy</Link>
-            <Link to="/about" className="underline-offset-4 hover:text-ink hover:underline">Terms of Service</Link>
-            <Link to="/about" className="underline-offset-4 hover:text-ink hover:underline">Contact Us</Link>
+        <div className="flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 sm:flex-row">
+          <p className="text-sm text-white/40">© {new Date().getFullYear()} Luxaar Institute. All rights reserved.</p>
+          <div className="flex gap-6 text-sm text-white/40">
+            <Link to="/about" className="underline-offset-4 hover:text-white hover:underline">Privacy Policy</Link>
+            <Link to="/about" className="underline-offset-4 hover:text-white hover:underline">Terms of Service</Link>
+            <Link to="/about" className="underline-offset-4 hover:text-white hover:underline">Contact Us</Link>
           </div>
         </div>
       </div>
