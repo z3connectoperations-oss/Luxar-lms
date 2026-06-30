@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
-import { api } from "../../lib/api";
+import { api, BASE } from "../../lib/api";
 import { Card, Chip } from "../../components/ui";
 import { FileText, Box, Download } from "lucide-react";
-
-const BASE = import.meta.env.VITE_API_URL || "http://localhost:8787";
 
 interface Product { id: string; title: string; type: string; hasDownload: boolean }
 interface Order { id: string; status: string; total: number; createdAt: string; }
