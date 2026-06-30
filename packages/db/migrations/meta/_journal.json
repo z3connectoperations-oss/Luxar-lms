@@ -1,0 +1,55 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1779909328117,
+      "tag": "0000_omniscient_kingpin",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1779942683392,
+      "tag": "0001_flat_bromley",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1779954728490,
+      "tag": "0002_eminent_whistler",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1779959765693,
+      "tag": "0003_graceful_wild_pack",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1779964087065,
+      "tag": "0004_many_captain_stacy",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1781250114364,
+      "tag": "0005_misty_sugar_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1781251551020,
+      "tag": "0006_opposite_wasp",
+      "breakpoints": true
+    }
+  ]
+}

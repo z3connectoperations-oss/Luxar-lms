@@ -1,0 +1,23 @@
+{
+  "name": "luxar-lms",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Luxar LMS — Cloudflare full-stack exam-prep platform",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "npm run dev --workspace @luxar/api",
+    "dev:web": "npm run dev --workspace @luxar/web",
+    "build": "npm run build --workspace @luxar/web",
+    "db:generate": "npm run generate --workspace @luxar/db",
+    "db:migrate:local": "npm run migrate:local --workspace @luxar/api",
+    "db:seed:local": "npm run seed:local --workspace @luxar/api"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,11 @@
+# Copy to `.dev.vars` (gitignored) and fill in. Used by `wrangler dev` locally.
+FIREBASE_PROJECT_ID=your-firebase-project-id
+SESSION_SECRET=change-me-to-a-long-random-string
+
+# Optional — fill to enable these features locally:
+# RESEND_API_KEY=re_xxx           # email notifications
+# EMAIL_FROM=Luxar LMS <no-reply@yourdomain>
+# RAZORPAY_KEY_ID=rzp_xxx         # real payments (else mock checkout)
+# RAZORPAY_KEY_SECRET=xxx
+# LIVEKIT_API_KEY=APIxxx          # live classes (from LiveKit Cloud dashboard)
+# LIVEKIT_API_SECRET=xxx

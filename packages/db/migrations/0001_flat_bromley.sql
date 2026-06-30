@@ -1,0 +1,1 @@
+ALTER TABLE `schedule_events` ADD `reminder_sent` integer DEFAULT false;

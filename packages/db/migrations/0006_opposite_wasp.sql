@@ -1,0 +1,1 @@
+ALTER TABLE `live_sessions` ADD `module_id` text REFERENCES modules(id);

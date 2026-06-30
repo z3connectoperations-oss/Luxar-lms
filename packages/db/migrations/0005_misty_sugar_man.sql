@@ -1,0 +1,1 @@
+ALTER TABLE `courses` ADD `intro_pdf_r2_key` text;

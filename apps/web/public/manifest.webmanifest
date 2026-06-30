@@ -1,0 +1,12 @@
+{
+  "name": "Luxaar Institute",
+  "short_name": "Luxaar",
+  "description": "Luxaar Institute — premium courses, live classes and certification.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAF8F3",
+  "theme_color": "#16130F",
+  "icons": [
+    { "src": "/luxaar.png", "sizes": "325x199", "type": "image/png" }
+  ]
+}

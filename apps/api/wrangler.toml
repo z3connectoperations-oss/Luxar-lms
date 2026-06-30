@@ -1,0 +1,30 @@
+name = "luxar-api"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# Production web origin (Cloudflare Pages). CORS also allows any *.pages.dev + localhost.
+[vars]
+WEB_ORIGIN = "https://luxar-lms.pages.dev"
+FIREBASE_PROJECT_ID = "luxar-lms"
+
+# Cron: send class-starting-soon reminders every 15 minutes.
+[triggers]
+crons = ["*/15 * * * *"]
+
+# D1 database (account: z3connect.operations@gmail.com, region APAC).
+# Local dev (`wrangler dev`) uses local state; `--remote` targets this real DB.
+[[d1_databases]]
+binding = "DB"
+database_name = "luxar-lms"
+database_id = "7c3e6fdc-54e4-4328-a4cc-7fe5681f6677"
+migrations_dir = "../../packages/db/migrations"
+
+# R2 bucket for files: PDFs, downloadable lesson videos, book/store assets, certificates.
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "luxar-lms-media"
+
+# Secrets (do NOT put real values here). Local: apps/api/.dev.vars
+# Production: `wrangler secret put <NAME>`
+#   FIREBASE_PROJECT_ID
+#   SESSION_SECRET
