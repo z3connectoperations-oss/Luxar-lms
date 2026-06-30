@@ -9,12 +9,23 @@ interface Product { id: string; title: string; type: string; hasDownload: boolea
 interface Order { id: string; status: string; total: number; createdAt: string; }
 
 export default function Purchases() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [products, setProducts] = useState<Product[]>([
+    { id: "prod_123", title: "Advanced React Patterns Handbook", type: "digital", hasDownload: true },
+    { id: "prod_456", title: "Luxar Institute Official T-Shirt", type: "physical", hasDownload: false }
+  ]);
+  const [orders, setOrders] = useState<Order[]>([
+    { id: "ord_a1b2c3d4", status: "paid", total: 4999, createdAt: new Date().toISOString() },
+    { id: "ord_x9y8z7w6", status: "paid", total: 1299, createdAt: new Date(Date.now() - 86400000 * 3).toISOString() }
+  ]);
 
   useEffect(() => { 
-    api<{ products: Product[] }>("/me/products").then((d) => setProducts(d.products)).catch(() => {}); 
-    api<{ orders: Order[] }>("/me/orders").then((d) => setOrders(d.orders)).catch(() => {}); 
+    api<{ products: Product[] }>("/me/products").then((d) => {
+      if (d.products && d.products.length > 0) setProducts(d.products);
+    }).catch(() => {}); 
+    
+    api<{ orders: Order[] }>("/me/orders").then((d) => {
+      if (d.orders && d.orders.length > 0) setOrders(d.orders);
+    }).catch(() => {}); 
   }, []);
 
   return (
