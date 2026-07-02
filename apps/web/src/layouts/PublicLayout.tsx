@@ -808,7 +808,7 @@ function Footer() {
           <p className="text-sm text-white/40">© {new Date().getFullYear()} Luxaar Institute. All rights reserved.</p>
           <div className="flex flex-wrap justify-center gap-6 text-sm text-white/40">
             <Link to="/privacy" className="underline-offset-4 hover:text-white hover:underline">Privacy Policy</Link>
-            <Link to="/terms" className="underline-offset-4 hover:text-white hover:underline">Terms of Service</Link>
+            <Link to="/terms" className="underline-offset-4 hover:text-white hover:underline">Terms and Conditions</Link>
             <Link to="/refund-policy" className="underline-offset-4 hover:text-white hover:underline">Refund Policy</Link>
             <Link to="/contact" className="underline-offset-4 hover:text-white hover:underline">Contact Us</Link>
           </div>
