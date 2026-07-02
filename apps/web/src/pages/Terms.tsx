@@ -31,6 +31,14 @@ export default function Terms() {
           <li>Your use of this platform and any dispute arising out of such use are subject to the laws of India.</li>
         </ul>
 
+        <h2 className="text-2xl font-bold text-ink mt-8">Pricing, Shipping and Delivery Policy</h2>
+        <ul className="list-disc pl-6 space-y-2">
+          <li><strong>Pricing:</strong> All product and course pricing is listed in Indian Rupees (INR, ₹) on the platform. Prices are subject to change without prior notice, but any changes will not affect active subscriptions or already purchased courses.</li>
+          <li><strong>Digital Delivery:</strong> Luxaar Institute offers digital educational content. There is no physical shipping of any goods, books, or materials unless explicitly stated.</li>
+          <li><strong>Delivery Timeline:</strong> Upon successful payment processing through PhonePe or our accepted payment gateways, your purchased course will be activated and accessible in your account dashboard <strong>instantly (within 5 minutes)</strong>.</li>
+          <li><strong>Access Issues:</strong> If you face any issues accessing your course after a successful payment, please contact our support team immediately at {supportEmail}.</li>
+        </ul>
+
         <h2 className="text-2xl font-bold text-ink mt-8">Students Terms and Conditions (Live Class Guidelines)</h2>
         <ul className="list-disc pl-6 space-y-2">
           <li><strong>Respectful Environment:</strong> Students must maintain a respectful and professional demeanor towards the instructors and fellow students. Harassment, disruptive behavior, or inappropriate language will not be tolerated and may lead to immediate suspension from the course without a refund.</li>
