@@ -31,6 +31,16 @@ export default function Terms() {
           <li>Your use of this platform and any dispute arising out of such use are subject to the laws of India.</li>
         </ul>
 
+        <h2 className="text-2xl font-bold text-ink mt-8">Students Terms and Conditions (Live Class Guidelines)</h2>
+        <ul className="list-disc pl-6 space-y-2">
+          <li><strong>Respectful Environment:</strong> Students must maintain a respectful and professional demeanor towards the instructors and fellow students. Harassment, disruptive behavior, or inappropriate language will not be tolerated and may lead to immediate suspension from the course without a refund.</li>
+          <li><strong>Punctuality:</strong> Students are expected to join live classes on time. The instructor reserves the right to lock the meeting room after a certain grace period to prevent disruptions.</li>
+          <li><strong>Missed Classes:</strong> If a student misses a live class, it is their responsibility to catch up using the recorded sessions (if provided). We do not conduct makeup live classes for individual absences.</li>
+          <li><strong>No Unauthorized Recording:</strong> Screen recording, photographing, or unauthorized capturing of live lectures by students is strictly prohibited and is a violation of copyright. Any material shared during the live class belongs to Luxaar Institute and cannot be shared publicly.</li>
+          <li><strong>Technical Requirements:</strong> It is the student’s responsibility to ensure they have a stable internet connection, a working microphone, and a camera. Luxaar Institute is not liable for classes missed due to a student’s personal technical or network issues.</li>
+          <li><strong>Rescheduling & Cancellations:</strong> Luxaar Institute reserves the right to reschedule or cancel a live class due to instructor unavailability, technical emergencies, or unforeseen circumstances. In such cases, students will be notified in advance and a makeup session will be arranged.</li>
+        </ul>
+
         <p><strong>Payments:</strong> Orders will be confirmed only upon receiving successful authorization and confirmation from the payment gateway (PhonePe or other supported providers).</p>
         <p><strong>Educational Purpose Only:</strong> Luxaar Institute is designed solely for educational and exam-preparation purposes to help users build subject knowledge and exam skills. We do not guarantee selection, rank, marks, or any specific outcome in any competitive examination.</p>
         <p><strong>No Selection or Income Assurance:</strong> The content, classes, and test series provided are for learning and self-assessment purposes only. We do not promise or imply any job placement, exam selection, or similar outcomes.</p>

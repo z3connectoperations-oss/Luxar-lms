@@ -68,6 +68,15 @@ export default function Privacy() {
         <h3 className="text-xl font-bold text-ink mt-6">Security of Your Personal Data</h3>
         <p>The security of your Personal Data is important to us. However, no method of transmission over the internet or electronic storage is 100% secure. While we strive to use commercially acceptable means to protect your Personal Data, we cannot guarantee its absolute security.</p>
 
+        <h3 className="text-xl font-bold text-ink mt-6">Live Class Privacy & Data Security</h3>
+        <p>To ensure a safe and secure learning environment during our live virtual classes, we enforce the following measures:</p>
+        <ul className="list-disc pl-6 space-y-1">
+          <li><strong>Secure Live Class Recordings:</strong> While our live classes may be recorded for the benefit of enrolled students to review later, we prioritize your privacy. Class recordings are strictly kept within our secure platform and are never distributed publicly or used for marketing purposes without your explicit written consent.</li>
+          <li><strong>Protection of Personal Contact Information:</strong> Your personal contact details (such as your phone number and email address) are completely hidden from other students during live classes and in community forums. Only your display name will be visible to your peers.</li>
+          <li><strong>Chat and Q&A Confidentiality:</strong> Any private messages sent to the instructor or support team during a live class are kept strictly confidential. We do not publish your personal queries or doubts publicly in a way that identifies you.</li>
+          <li><strong>Camera and Microphone Autonomy:</strong> We respect your personal space. While active participation is encouraged, you always have the right to keep your camera turned off during live sessions. We do not use intrusive monitoring, eye-tracking, or facial recognition technologies during our classes.</li>
+        </ul>
+
         <h3 className="text-xl font-bold text-ink mt-6">Children's Privacy</h3>
         <p>Our Service is intended for users who are generally 13 years of age and older. We do not knowingly collect personally identifiable information from anyone under the age of 13 without parental consent. If you are a parent or guardian and believe your child has provided us with Personal Data, please contact us so we can take appropriate action.</p>
 
