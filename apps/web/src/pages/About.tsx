@@ -123,12 +123,12 @@ export default function About() {
             </p>
             <div className="mt-10 flex flex-wrap justify-center gap-4">
               <Link to="/courses">
-                <Button size="lg" className="min-w-[160px] bg-white text-ink hover:bg-neutral-100 hover:text-ink">
+                <Button className="min-w-[160px] border-none !bg-white font-bold !text-ink hover:!bg-neutral-200">
                   Explore Courses
                 </Button>
               </Link>
               <Link to="/login">
-                <Button size="lg" variant="cta" className="min-w-[160px]">
+                <Button variant="cta" className="min-w-[160px]">
                   Sign Up for Free
                 </Button>
               </Link>
