@@ -28,6 +28,7 @@ app.use("*", (c, next) =>
       if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return origin; // dev
       if (/\.pages\.dev$/.test(new URL(origin).hostname)) return origin; // Cloudflare Pages (prod + previews)
       if (origin === c.env.CORS_ORIGIN) return origin; // configured production origin / custom domain
+      if (c.env.CORS_ORIGIN && origin === c.env.CORS_ORIGIN.replace("https://", "https://www.")) return origin; // allow www variant
       return c.env.CORS_ORIGIN || "http://localhost:5173";
     },
     credentials: true,
