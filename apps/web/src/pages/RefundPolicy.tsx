@@ -10,11 +10,12 @@ export default function RefundPolicy() {
       
       <div className="space-y-6 text-muted leading-relaxed">
         <p>
-          You are entitled to request a refund within <strong>7 (seven) days</strong> from the date of your course purchase/enrollment.
+          Refunds are only issued in the event that you mistakenly purchased the course. 
+          If you have accessed, watched, or used the course content for any duration (for example, if you have been enrolled for a few days), you will not be eligible for a refund.
         </p>
         
         <p>
-          To request a refund, please contact us at <strong>{supportEmail}</strong> or <strong>{supportPhone}</strong> with your registered mobile number and order/transaction ID, within 7 days of purchase.
+          To request a refund for a mistaken purchase, please contact us at <strong>{supportEmail}</strong> or <strong>{supportPhone}</strong> with your registered mobile number and order/transaction ID immediately after the purchase.
         </p>
         
         <p>
@@ -28,11 +29,7 @@ export default function RefundPolicy() {
         </ul>
         
         <p>
-          Refund requests made <strong>after 7 days</strong> from the date of purchase will not be considered, except in cases of duplicate payment or technical error as described above, as this is a digital course purchase.
-        </p>
-        
-        <p>
-          In the rare event that Luxaar Institute cancels a course or batch, you will be offered a full refund or the option to switch to an equivalent course, regardless of the 7-day window.
+          In the rare event that Luxaar Institute cancels a course or batch, you will be offered a full refund or the option to switch to an equivalent course.
         </p>
         
         <p>
