@@ -4,7 +4,7 @@ import { Card, Chip } from "../../components/ui";
 import { FileText, Box, Download } from "lucide-react";
 
 interface Product { id: string; title: string; type: string; hasDownload: boolean }
-interface Order { id: string; status: string; total: number; createdAt: string; }
+interface Order { id: string; status: string; paymentStatus: string; provider: string; transactionId: string; total: number; createdAt: string; }
 
 export default function Purchases() {
   const [products, setProducts] = useState<Product[]>([
@@ -12,8 +12,8 @@ export default function Purchases() {
     { id: "prod_456", title: "Luxar Institute Official T-Shirt", type: "physical", hasDownload: false }
   ]);
   const [orders, setOrders] = useState<Order[]>([
-    { id: "ord_a1b2c3d4", status: "paid", total: 4999, createdAt: new Date().toISOString() },
-    { id: "ord_x9y8z7w6", status: "paid", total: 1299, createdAt: new Date(Date.now() - 86400000 * 3).toISOString() }
+    { id: "ord_a1b2c3d4", status: "paid", paymentStatus: "SUCCESS", provider: "phonepe", transactionId: "T_123456", total: 4999, createdAt: new Date().toISOString() },
+    { id: "ord_x9y8z7w6", status: "paid", paymentStatus: "SUCCESS", provider: "phonepe", transactionId: "T_654321", total: 1299, createdAt: new Date(Date.now() - 86400000 * 3).toISOString() }
   ]);
 
   useEffect(() => { 
@@ -42,7 +42,9 @@ export default function Purchases() {
                   </div>
                   <div>
                     <div className="font-semibold text-ink">Order #{o.id.slice(0, 8).toUpperCase()}</div>
-                    <div className="text-sm text-muted">{new Date(o.createdAt).toLocaleDateString()}</div>
+                    <div className="text-sm text-muted">Trans: {o.transactionId}</div>
+                    <div className="text-xs text-muted uppercase tracking-widest mt-1 opacity-70">VIA {o.provider}</div>
+                    <div className="text-sm text-muted mt-1">{new Date(o.createdAt).toLocaleDateString()}</div>
                   </div>
                 </div>
                 <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto">

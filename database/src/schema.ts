@@ -215,6 +215,47 @@ export const orders = sqliteTable("orders", {
   total: integer("total").notNull().default(0),
   couponId: text("coupon_id").references(() => coupons.id),
   createdAt: createdAt(),
+
+  // PhonePe / Enterprise Payment Fields
+  paymentProvider: text("payment_provider"), // 'phonepe'
+  merchantTransactionId: text("merchant_transaction_id").unique(),
+  phonepeTransactionId: text("phonepe_transaction_id"),
+  paymentStatus: text("payment_status").default("PENDING"), // PENDING, INITIATED, PROCESSING, SUCCESS, FAILED, CANCELLED, EXPIRED, REFUNDED
+  paymentResponseJson: text("payment_response_json"),
+  paymentCompletedAt: ts("payment_completed_at"),
+  paymentFailedReason: text("payment_failed_reason"),
+  paymentVerified: bool("payment_verified").default(false),
+  webhookReceived: bool("webhook_received").default(false),
+
+  // Refund Fields
+  refundStatus: text("refund_status"),
+  refundAmount: integer("refund_amount"),
+  refundReference: text("refund_reference"),
+  refundReason: text("refund_reason"),
+});
+
+export const paymentLogs = sqliteTable("payment_logs", {
+  id: id(),
+  orderId: text("order_id").references(() => orders.id),
+  merchantTransactionId: text("merchant_transaction_id"),
+  provider: text("provider"),
+  event: text("event").notNull(),
+  requestPayload: text("request_payload"),
+  responsePayload: text("response_payload"),
+  status: text("status"),
+  ipAddress: text("ip_address"),
+  createdAt: createdAt(),
+});
+
+export const invoices = sqliteTable("invoices", {
+  id: id(),
+  orderId: text("order_id").notNull().references(() => orders.id),
+  userId: text("user_id").notNull().references(() => users.id),
+  invoiceNumber: text("invoice_number").notNull().unique(),
+  amount: integer("amount").notNull(),
+  businessDetails: text("business_details"),
+  pdfR2Key: text("pdf_r2_key"),
+  createdAt: createdAt(),
 });
 
 export const orderItems = sqliteTable("order_items", {

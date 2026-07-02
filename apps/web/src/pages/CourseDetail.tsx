@@ -89,7 +89,7 @@ export default function CourseDetail() {
     if (!user) return navigate("/login");
     setErr(""); setBusy(true);
     try {
-      await enrollInCourse(data.course.id, undefined, user);
+      await enrollInCourse(data.course.id, undefined);
       navigate("/student");
     } catch (e: any) {
       setErr(e?.message || "Checkout failed");

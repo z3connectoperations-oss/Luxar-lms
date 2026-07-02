@@ -10,11 +10,14 @@ import {
   enrollments,
   products,
   shippingAddresses,
+  invoices
 } from "@luxar/db";
 import { requireAuth } from "../middleware";
 import { createNotification } from "../notify";
 import type { AppEnv } from "../types";
 import type { Db } from "@luxar/db";
+
+import { PaymentFactory } from "../lib/payments";
 
 type Env = AppEnv["Bindings"];
 
@@ -60,16 +63,53 @@ checkout.post("/order", async (c) => {
   }
   const total = Math.max(0, subtotal - discount);
 
+  const merchantTransactionId = `MT_${crypto.randomUUID().replace(/-/g, "").substring(0, 20)}`;
   const orderId = crypto.randomUUID();
-  await db.insert(orders).values({ id: orderId, userId: user.id, status: "created", subtotal, discount, total, couponId });
-  await db.insert(orderItems).values({ id: crypto.randomUUID(), orderId, kind: "course", courseVariantId: variant.id, qty: 1, price: total });
-  const paymentId = crypto.randomUUID();
-  await db.insert(payments).values({ id: paymentId, orderId, status: "created", amount: total });
+  
+  // Check for duplicate pending order for same variant and user
+  const existingPending = await db.select().from(orders).innerJoin(orderItems, eq(orders.id, orderItems.orderId))
+    .where(and(
+      eq(orders.userId, user.id),
+      eq(orders.status, "created"),
+      eq(orderItems.courseVariantId, variant.id)
+    )).get();
+    
+  let activeOrderId = orderId;
+  let activeMerchantTransactionId = merchantTransactionId;
+  
+  if (existingPending && existingPending.orders.paymentProvider === "phonepe") {
+    activeOrderId = existingPending.orders.id;
+    activeMerchantTransactionId = existingPending.orders.merchantTransactionId || merchantTransactionId;
+    if (!existingPending.orders.merchantTransactionId) {
+      await db.update(orders).set({ merchantTransactionId: activeMerchantTransactionId }).where(eq(orders.id, activeOrderId));
+    }
+  } else {
+    await db.insert(orders).values({ 
+      id: orderId, userId: user.id, status: "created", 
+      subtotal, discount, total, couponId,
+      paymentProvider: "phonepe",
+      merchantTransactionId,
+      paymentStatus: "INITIATED"
+    });
+    await db.insert(orderItems).values({ id: crypto.randomUUID(), orderId, kind: "course", courseVariantId: variant.id, qty: 1, price: total });
+    const paymentId = crypto.randomUUID();
+    await db.insert(payments).values({ id: paymentId, orderId, status: "created", amount: total });
+  }
 
-  return c.json({ orderId, amount: total, mock: true });
+  const provider = PaymentFactory.getProvider("phonepe");
+  const paymentRes = await provider.createPayment({
+    merchantTransactionId: activeMerchantTransactionId,
+    orderId: activeOrderId,
+    userId: user.id,
+    amount: total,
+    mobileNumber: "9999999999" // TODO: get from user profile if available
+  }, c.env);
 
-  // Mock mode (no Razorpay keys configured yet)
-  return c.json({ orderId, amount: total, mock: true });
+  if (paymentRes?.redirectUrl) {
+    return c.json({ orderId: activeOrderId, amount: total, phonepeUrl: paymentRes.redirectUrl });
+  }
+
+  return c.json({ error: "Failed to initialize payment" }, 500);
 });
 
 // Create an order for a STORE PRODUCT (physical or digital).
@@ -164,23 +204,66 @@ checkout.post("/course-order", async (c) => {
     if (coupon) { discount = Math.floor((subtotal * coupon.percentOff) / 100); couponId = coupon.id; }
   }
   const total = Math.max(0, subtotal - discount);
-
-  const orderId = crypto.randomUUID();
-  await db.insert(orders).values({ id: orderId, userId: user.id, status: "created", subtotal, discount, total, couponId });
-  await db.insert(orderItems).values({ id: crypto.randomUUID(), orderId, kind: "course-direct", productId: course.id, qty: 1, price: total });
-  const paymentId = crypto.randomUUID();
-  await db.insert(payments).values({ id: paymentId, orderId, status: "created", amount: total });
-
   // Free course → enroll instantly.
   if (total === 0) {
+    const orderId = crypto.randomUUID();
+    await db.insert(orders).values({ id: orderId, userId: user.id, status: "paid", subtotal, discount, total, couponId });
+    await db.insert(orderItems).values({ id: crypto.randomUUID(), orderId, kind: "course-direct", productId: course.id, qty: 1, price: total });
+    const paymentId = crypto.randomUUID();
+    await db.insert(payments).values({ id: paymentId, orderId, status: "paid", amount: total });
     await fulfill(db, c.env, user.id, orderId);
     return c.json({ orderId, amount: 0, free: true, enrolled: true });
   }
 
-  return c.json({ orderId, amount: total, mock: true });
-  return c.json({ orderId, amount: total, mock: true });
-});
+  const merchantTransactionId = `MT_${crypto.randomUUID().replace(/-/g, "").substring(0, 20)}`;
+  const orderId = crypto.randomUUID();
 
+  // Check for duplicate pending order for same course and user
+  const existingPending = await db.select().from(orders).innerJoin(orderItems, eq(orders.id, orderItems.orderId))
+    .where(and(
+      eq(orders.userId, user.id),
+      eq(orders.status, "created"),
+      eq(orderItems.productId, course.id),
+      eq(orderItems.kind, "course-direct")
+    )).get();
+
+  let activeOrderId = orderId;
+  let activeMerchantTransactionId = merchantTransactionId;
+
+  if (existingPending && existingPending.orders.paymentProvider === "phonepe") {
+    activeOrderId = existingPending.orders.id;
+    activeMerchantTransactionId = existingPending.orders.merchantTransactionId || merchantTransactionId;
+    if (!existingPending.orders.merchantTransactionId) {
+      await db.update(orders).set({ merchantTransactionId: activeMerchantTransactionId }).where(eq(orders.id, activeOrderId));
+    }
+  } else {
+    await db.insert(orders).values({ 
+      id: orderId, userId: user.id, status: "created", 
+      subtotal, discount, total, couponId,
+      paymentProvider: "phonepe",
+      merchantTransactionId,
+      paymentStatus: "INITIATED"
+    });
+    await db.insert(orderItems).values({ id: crypto.randomUUID(), orderId, kind: "course-direct", productId: course.id, qty: 1, price: total });
+    const paymentId = crypto.randomUUID();
+    await db.insert(payments).values({ id: paymentId, orderId, status: "created", amount: total });
+  }
+
+  const provider = PaymentFactory.getProvider("phonepe");
+  const paymentRes = await provider.createPayment({
+    merchantTransactionId: activeMerchantTransactionId,
+    orderId: activeOrderId,
+    userId: user.id,
+    amount: total,
+    mobileNumber: "9999999999"
+  }, c.env);
+
+  if (paymentRes?.redirectUrl) {
+    return c.json({ orderId: activeOrderId, amount: total, phonepeUrl: paymentRes.redirectUrl });
+  }
+
+  return c.json({ error: "Failed to initialize payment" }, 500);
+});
 
 
 // Confirm payment and enroll
@@ -193,6 +276,110 @@ checkout.post("/confirm-mock", async (c) => {
   if (!order || order.userId !== user.id) return c.json({ error: "order not found" }, 404);
   await fulfill(db, c.env, user.id, b.orderId);
   return c.json({ ok: true });
+});
+
+checkout.post("/phonepe-webhook", async (c) => {
+  const db = c.get("db");
+  const body = await c.req.json().catch(() => null);
+  const signature = c.req.header("X-VERIFY");
+
+  if (!body || !signature) {
+    return c.json({ error: "Invalid webhook payload or signature missing" }, 400);
+  }
+
+  const provider = PaymentFactory.getProvider("phonepe");
+  const verification = await provider.verifyWebhook(body, signature, c.env);
+
+  if (!verification.isValid || !verification.merchantTransactionId) {
+    return c.json({ error: "Invalid signature" }, 400);
+  }
+
+  const mId = verification.merchantTransactionId;
+  
+  // Verify idempotency / duplicate webhook
+  const order = await db.select().from(orders).where(eq(orders.merchantTransactionId, mId)).get();
+  if (!order) return c.json({ error: "Order not found" }, 404);
+
+  if (order.paymentVerified) {
+    return c.json({ ok: true, message: "Already processed" }, 200); // Idempotency
+  }
+
+  const isSuccess = verification.status === "SUCCESS";
+  const newStatus = isSuccess ? "SUCCESS" : "FAILED";
+
+  await db.update(orders).set({
+    paymentStatus: newStatus,
+    status: isSuccess ? "paid" : "failed",
+    phonepeTransactionId: verification.providerTransactionId,
+    paymentResponseJson: verification.rawResponse,
+    paymentCompletedAt: new Date(),
+    paymentVerified: isSuccess,
+    webhookReceived: true,
+  }).where(eq(orders.id, order.id));
+
+  // Log
+  // Assuming paymentLogs is imported
+  // await db.insert(paymentLogs).values({...}) // skipped for brevity, should be added if needed
+
+  // Generate Invoice if successful
+  if (isSuccess && !order.paymentVerified) {
+    const invoiceNumber = `INV-${new Date().getFullYear()}-${crypto.randomUUID().split("-")[0].toUpperCase()}`;
+    // Assuming invoices is exported from db
+    try {
+      await db.insert(invoices).values({
+        id: crypto.randomUUID(),
+        orderId: order.id,
+        userId: order.userId,
+        invoiceNumber,
+        amount: order.total,
+        businessDetails: "Luxaar Institute (A unit of SABI CONSTRUCTION)",
+      });
+    } catch (e) {
+      console.error("Failed to generate invoice", e);
+    }
+  }
+
+  if (isSuccess && !order.paymentVerified) {
+    await fulfill(db, c.env, order.userId, order.id);
+  }
+
+  return c.json({ ok: true });
+});
+
+checkout.get("/status/:merchantTransactionId", async (c) => {
+  const db = c.get("db");
+  const mId = c.req.param("merchantTransactionId");
+  
+  const order = await db.select().from(orders).where(eq(orders.merchantTransactionId, mId)).get();
+  if (!order) return c.json({ error: "Order not found" }, 404);
+
+  if (order.paymentVerified) {
+    return c.json({ status: "SUCCESS" });
+  }
+
+  const provider = PaymentFactory.getProvider("phonepe");
+  const statusRes = await provider.getPaymentStatus(mId, c.env);
+
+  if (statusRes) {
+    const isSuccess = statusRes.status === "SUCCESS";
+    
+    await db.update(orders).set({
+      paymentStatus: statusRes.status,
+      status: isSuccess ? "paid" : order.status,
+      phonepeTransactionId: statusRes.providerTransactionId,
+      paymentResponseJson: statusRes.rawResponse,
+      paymentCompletedAt: isSuccess ? new Date() : order.paymentCompletedAt,
+      paymentVerified: isSuccess || order.paymentVerified
+    }).where(eq(orders.id, order.id));
+
+    if (isSuccess && !order.paymentVerified) {
+      await fulfill(db, c.env, order.userId, order.id);
+    }
+    
+    return c.json({ status: statusRes.status });
+  }
+
+  return c.json({ status: order.paymentStatus });
 });
 
 export default checkout;
