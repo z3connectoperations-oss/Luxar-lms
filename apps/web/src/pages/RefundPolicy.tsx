@@ -10,8 +10,8 @@ export default function RefundPolicy() {
       
       <div className="space-y-6 text-muted leading-relaxed">
         <p>
-          Refunds are only issued in the event that you mistakenly purchased the course. 
-          If you have accessed, watched, or used the course content for any duration (for example, if you have been enrolled for a few days), you will not be eligible for a refund.
+          Refunds are only issued in the event that you mistakenly purchase a course. 
+          If you have accessed, watched, or used the course content for any duration (for example, if you have been enrolled and active for a few days), you will not be eligible for a refund.
         </p>
         
         <p>
@@ -19,12 +19,12 @@ export default function RefundPolicy() {
         </p>
         
         <p>
-          Once your refund request is approved, it will be processed within <strong>5 (five) business days</strong>. The refunded amount will be credited back to your original payment method via our payment gateway partner (PhonePe). Depending on your bank, it may take a few additional days for the amount to reflect in your account after we process it.
+          Once your refund request is approved, it will be processed within <strong>5 (five) business days</strong>. The refunded amount will be credited back to your original payment method via our payment gateway partner (PhonePe). Depending on your bank, it may take a few additional days for the amount to reflect in your account after we process the refund.
         </p>
         
         <p>You are also entitled to a refund if:</p>
         <ul className="list-disc pl-6 space-y-2">
-          <li>The purchased course was not assigned/activated in your account within the expected timeframe from your date of purchase, or</li>
+          <li>The purchased course was not assigned or activated in your account within the expected timeframe from your date of purchase.</li>
           <li>You have been charged twice for the same course due to a technical or payment error.</li>
         </ul>
         
@@ -33,7 +33,7 @@ export default function RefundPolicy() {
         </p>
         
         <p>
-          All refunds are credited only to the original mode of payment used at the time of purchase.
+          All refunds are credited strictly to the original mode of payment used at the time of purchase.
         </p>
         
         <hr className="my-8 border-gray-200" />
