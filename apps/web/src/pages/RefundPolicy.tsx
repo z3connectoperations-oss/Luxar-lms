@@ -2,7 +2,7 @@ import React from "react";
 
 export default function RefundPolicy() {
   const supportEmail = "luxaarinstitute@gmail.com";
-  const supportPhone = "+91 9443241572";
+  const supportPhone = "+91 9443472954";
 
   return (
     <div className="mx-auto max-w-4xl space-y-8 px-5 py-14 text-ink">
@@ -19,7 +19,7 @@ export default function RefundPolicy() {
         </p>
         
         <p>
-          Once your refund request is approved, it will be processed within <strong>5 (five) business days</strong>. The refunded amount will be credited back to your original payment method via our payment gateway partner (PhonePe). Depending on your bank, it may take a few additional days for the amount to reflect in your account after we process the refund.
+          Once your refund request is approved, it will be processed within <strong>8 (eight) business days</strong>. The refunded amount will be credited back to your original payment method via our payment gateway partner (PhonePe). Depending on your bank, it may take a few additional days for the amount to reflect in your account after we process the refund.
         </p>
         
         <p>You are also entitled to a refund if:</p>

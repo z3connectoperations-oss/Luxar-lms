@@ -74,7 +74,7 @@ export default function Contact() {
                 </div>
                 <div>
                   <h3 className="font-bold text-ink">Call Us</h3>
-                  <p className="mt-1 text-muted">+91 9443241572</p>
+                  <p className="mt-1 text-muted">+91 9443472954</p>
                   <p className="mt-1 text-xs text-muted">Mon - Sat (9:00 AM to 6:00 PM)</p>
                 </div>
               </div>

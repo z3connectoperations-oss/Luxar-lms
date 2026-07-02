@@ -798,7 +798,7 @@ function Footer() {
             <h4 className="text-xs font-bold uppercase tracking-widest text-gold-400">Contact</h4>
             <ul className="mt-5 space-y-3 text-sm text-white/60">
               <li className="flex items-center gap-2"><Mail size={16} className="shrink-0 text-gold-400" /> <a href="mailto:luxaarinstitute@gmail.com" className="transition hover:text-gold-400">luxaarinstitute@gmail.com</a></li>
-              <li className="flex items-center gap-2"><Phone size={16} className="shrink-0 text-gold-400" /> <a href="tel:+919443241572" className="transition hover:text-gold-400">+91 9443241572</a></li>
+              <li className="flex items-center gap-2"><Phone size={16} className="shrink-0 text-gold-400" /> <a href="tel:+919443472954" className="transition hover:text-gold-400">+91 9443472954</a></li>
               <li className="flex items-start gap-2"><MapPin size={16} className="mt-0.5 shrink-0 text-gold-400" /> <span>Kanyakumari, Tamilnadu</span></li>
             </ul>
           </div>
