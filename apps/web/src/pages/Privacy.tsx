@@ -86,6 +86,16 @@ export default function Privacy() {
         <h3 className="text-xl font-bold text-ink mt-6">Changes to This Privacy Policy</h3>
         <p>We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last updated" date. You are advised to review this Privacy Policy periodically.</p>
 
+        <h3 className="text-xl font-bold text-ink mt-6">Grievance Officer</h3>
+        <p>In accordance with the Information Technology Act, 2000 and rules made there under, the name and contact details of the Grievance Officer are provided below:</p>
+        <ul className="list-disc pl-6 space-y-1">
+          <li><strong>Name:</strong> SABISHA S</li>
+          <li><strong>Company:</strong> Luxaar Institute (A unit of SABI CONSTRUCTION)</li>
+          <li><strong>Address:</strong> 14/2/5, 14, 5F-3 MOOLACHEL, VERKILAMBI, KANYAKUMARI, TAMIL NADU, 629166</li>
+          <li><strong>Email:</strong> {supportEmail}</li>
+          <li><strong>Phone:</strong> +91 9443472954</li>
+        </ul>
+
         <hr className="my-8 border-gray-200" />
         
         <p>If you have any questions about this Privacy Policy, you can contact us at <strong>{supportEmail}</strong>.</p>

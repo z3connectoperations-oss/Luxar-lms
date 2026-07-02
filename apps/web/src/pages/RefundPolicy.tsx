@@ -35,6 +35,16 @@ export default function RefundPolicy() {
         <p>
           All refunds are credited strictly to the original mode of payment used at the time of purchase.
         </p>
+
+        <h2 className="text-2xl font-bold text-ink mt-8">Cancellation Policy</h2>
+        <p>
+          You may request a cancellation of your course enrollment within 24 hours of purchase, provided that you have not accessed, viewed, or downloaded any course material. Once the course material has been accessed, no cancellation will be permitted. To request a cancellation, please contact our support team.
+        </p>
+
+        <h2 className="text-2xl font-bold text-ink mt-8">Return Policy</h2>
+        <p>
+          Since Luxaar Institute (A unit of SABI CONSTRUCTION) provides digital educational content and services, we do not ship physical goods. Therefore, <strong>we do not accept returns</strong>. All digital sales are final, subject only to the specific refund conditions outlined in this policy.
+        </p>
         
         <hr className="my-8 border-gray-200" />
         
