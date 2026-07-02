@@ -16,6 +16,8 @@ export default function Purchases() {
     { id: "ord_x9y8z7w6", status: "paid", paymentStatus: "SUCCESS", provider: "phonepe", transactionId: "T_654321", total: 1299, createdAt: new Date(Date.now() - 86400000 * 3).toISOString() }
   ]);
 
+  const [mockTests, setMockTests] = useState<any[]>([]);
+
   useEffect(() => { 
     api<{ products: Product[] }>("/me/products").then((d) => {
       if (d.products && d.products.length > 0) setProducts(d.products);
@@ -24,6 +26,10 @@ export default function Purchases() {
     api<{ orders: Order[] }>("/me/orders").then((d) => {
       if (d.orders && d.orders.length > 0) setOrders(d.orders);
     }).catch(() => {}); 
+
+    api<{ attempts: any[] }>("/learn/my-mock-tests").then((d) => {
+      if (d.attempts && d.attempts.length > 0) setMockTests(d.attempts);
+    }).catch(() => {});
   }, []);
 
   return (
@@ -61,6 +67,37 @@ export default function Purchases() {
           </div>
         )}
       </div>
+
+      {mockTests.length > 0 && (
+        <div>
+          <h2 className="text-lg font-bold text-ink mb-4">My Mock Tests</h2>
+          <div className="space-y-3">
+            {mockTests.map((mt) => (
+              <Card key={mt.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <div className="font-semibold text-ink">{mt.testTitle}</div>
+                  <div className="text-sm text-muted mt-1">
+                    {mt.status === "submitted" && mt.submittedAt 
+                      ? `Submitted on ${new Date(mt.submittedAt).toLocaleDateString()}` 
+                      : "In Progress"}
+                  </div>
+                </div>
+                <div>
+                  {mt.status === "submitted" ? (
+                    <a href={`/student/mock-attempts/${mt.id}/result`} className="text-brand-600 font-semibold hover:underline text-sm">
+                      View Results (Score: {mt.score})
+                    </a>
+                  ) : (
+                    <a href={`/student/mock-attempts/${mt.id}`} className="text-brand-600 font-semibold hover:underline text-sm">
+                      Resume Test
+                    </a>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       {products.length > 0 && (
         <div>

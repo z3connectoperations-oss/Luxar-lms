@@ -23,6 +23,9 @@ import Notifications from "./pages/Notifications";
 import Tests from "./pages/student/Tests";
 import TestPlayer from "./pages/student/TestPlayer";
 import TestResult from "./pages/student/TestResult";
+import MockTestIntro from "./pages/student/MockTestIntro";
+import MockTestPlayer from "./pages/student/MockTestPlayer";
+import MockTestResult from "./pages/student/MockTestResult";
 import TrainerCourses from "./pages/trainer/TrainerCourses";
 import TrainerCourseManage from "./pages/trainer/CourseManage";
 import TrainerSchedule from "./pages/trainer/TrainerSchedule";
@@ -44,6 +47,7 @@ import AdminEnrollments from "./pages/admin/Enrollments";
 import AdminEnrollmentDetail from "./pages/admin/EnrollmentDetail";
 import AdminLeads from "./pages/admin/Leads";
 import AdminExams from "./pages/admin/Exams";
+import AdminMockTestManage from "./pages/admin/MockTestManage";
 
 export default function App() {
   return (
@@ -88,6 +92,9 @@ export default function App() {
             <Route path="/student/tests" element={<Tests />} />
             <Route path="/student/tests/:testId/take" element={<TestPlayer />} />
             <Route path="/student/tests/result/:attemptId" element={<TestResult />} />
+            <Route path="/student/mock-tests/:id/intro" element={<MockTestIntro />} />
+            <Route path="/student/mock-attempts/:id" element={<MockTestPlayer />} />
+            <Route path="/student/mock-attempts/:id/result" element={<MockTestResult />} />
             <Route path="/student/mentorship" element={<StudentMentorship />} />
             <Route path="/student/interview" element={<StudentInterview />} />
             <Route path="/student/purchases" element={<Purchases />} />
@@ -124,6 +131,7 @@ export default function App() {
             <Route path="/admin/categories" element={<AdminCategories />} />
             <Route path="/admin/courses" element={<AdminCourses />} />
             <Route path="/admin/courses/:id" element={<AdminCourseEdit />} />
+            <Route path="/admin/modules/:moduleId/mock-test" element={<AdminMockTestManage />} />
             <Route path="/admin/exams" element={<AdminExams />} />
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/enrollments" element={<AdminEnrollments />} />

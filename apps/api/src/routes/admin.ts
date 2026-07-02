@@ -21,6 +21,8 @@ import {
   orders,
   orderItems,
   leads,
+  mockTests,
+  mockQuestions,
 } from "@luxar/db";
 import { requireRole } from "../middleware";
 import type { AppEnv } from "../types";
@@ -562,6 +564,21 @@ admin.get("/enrollments/courses/:courseId", async (c) => {
     }
   }
 
+  const mockAttemptsData = userIds.length ? await db.select({
+    userId: mockAttempts.userId,
+    status: mockAttempts.status
+  })
+  .from(mockAttempts)
+  .innerJoin(mockTests, eq(mockAttempts.mockTestId, mockTests.id))
+  .innerJoin(modules, eq(mockTests.moduleId, modules.id))
+  .where(and(eq(modules.courseId, courseId), eq(mockAttempts.status, "submitted"), inArray(mockAttempts.userId, userIds)))
+  .all() : [];
+
+  const mocksCompletedByUser = new Map<string, number>();
+  for (const ma of mockAttemptsData) {
+    mocksCompletedByUser.set(ma.userId, (mocksCompletedByUser.get(ma.userId) || 0) + 1);
+  }
+
   const rows = enrs.map((e, i) => {
     const u = userById.get(e.userId);
     const pay = paymentByUser.get(e.userId);
@@ -577,6 +594,7 @@ admin.get("/enrollments/courses/:courseId", async (c) => {
       progressPct: e.progressPct ?? 0,
       amountPaise: pay?.amount ?? 0,
       paymentStatus: pay?.status ?? (e.variantId ? "unpaid" : "free"),
+      mockTestsCompleted: mocksCompletedByUser.get(e.userId) || 0,
     };
   });
 
@@ -588,17 +606,143 @@ admin.get("/enrollments/courses/:courseId", async (c) => {
   });
 });
 
-// ---- File upload to R2 ----------------------------------------------------
-// PUT /admin/upload?folder=materials&filename=notes.pdf  (raw body = file)
-admin.put("/upload", async (c) => {
-  const folder = (c.req.query("folder") || "uploads").replace(/[^a-z0-9/_-]/gi, "");
-  const filename = (c.req.query("filename") || "file").replace(/[^a-z0-9._-]/gi, "_");
-  const key = `${folder}/${crypto.randomUUID()}-${filename}`;
-  const body = await c.req.arrayBuffer();
-  await c.env.BUCKET.put(key, body, {
-    httpMetadata: { contentType: c.req.header("content-type") || "application/octet-stream" },
+// ---- Enterprise Mock Tests --------------------------------------------------
+admin.get("/courses/:courseId/mock-tests", async (c) => {
+  const db = c.get("db");
+  const courseId = c.req.param("courseId");
+  
+  // Get all modules for this course
+  const mods = await db.select().from(modules).where(eq(modules.courseId, courseId)).orderBy(modules.position).all();
+  
+  // Get all mock tests for these modules
+  const tests = await db.select().from(mockTests).where(eq(mockTests.courseId, courseId)).all();
+  const testByModule = new Map(tests.map(t => [t.moduleId, t]));
+
+  // Combine
+  const result = mods.map(m => ({
+    module: m,
+    mockTest: testByModule.get(m.id) || null
+  }));
+
+  return c.json({ modules: result });
+});
+
+admin.get("/mock-tests/:id", async (c) => {
+  const test = await c.get("db").select().from(mockTests).where(eq(mockTests.id, c.req.param("id"))).get();
+  if (!test) return c.json({ error: "Not found" }, 404);
+  return c.json({ mockTest: test });
+});
+
+admin.get("/modules/:moduleId/mock-tests", async (c) => {
+  const db = c.get("db");
+  const moduleId = c.req.param("moduleId");
+  
+  const mod = await db.select().from(modules).where(eq(modules.id, moduleId)).get();
+  if (!mod) return c.json({ error: "Module not found" }, 404);
+
+  const test = await db.select().from(mockTests).where(eq(mockTests.moduleId, moduleId)).get();
+  return c.json({ module: mod, mockTest: test || null });
+});
+
+admin.post("/modules/:moduleId/mock-tests", async (c) => {
+  const db = c.get("db");
+  const moduleId = c.req.param("moduleId");
+  const b = await c.req.json();
+  
+  const mod = await db.select().from(modules).where(eq(modules.id, moduleId)).get();
+  if (!mod) return c.json({ error: "Module not found" }, 404);
+
+  const existing = await db.select().from(mockTests).where(eq(mockTests.moduleId, moduleId)).get();
+  
+  if (existing) {
+    await db.update(mockTests).set({
+      title: b.title,
+      description: b.description,
+      durationMin: b.durationMin,
+      passingMarks: b.passingMarks,
+      passingPct: b.passingPct,
+      maxAttempts: b.maxAttempts,
+      status: b.status,
+    }).where(eq(mockTests.id, existing.id));
+    return c.json({ id: existing.id });
+  } else {
+    const id = crypto.randomUUID();
+    await db.insert(mockTests).values({
+      id,
+      courseId: mod.courseId,
+      moduleId,
+      title: b.title,
+      description: b.description,
+      durationMin: b.durationMin,
+      passingMarks: b.passingMarks,
+      passingPct: b.passingPct,
+      maxAttempts: b.maxAttempts,
+      status: b.status || "draft",
+    });
+    return c.json({ id });
+  }
+});
+
+admin.get("/mock-tests/:id/questions", async (c) => {
+  const qs = await c.get("db").select().from(mockQuestions)
+    .where(eq(mockQuestions.mockTestId, c.req.param("id")))
+    .orderBy(mockQuestions.position).all();
+  return c.json({ questions: qs });
+});
+
+admin.post("/mock-tests/:id/questions", async (c) => {
+  const b = await c.req.json();
+  const id = crypto.randomUUID();
+  await c.get("db").insert(mockQuestions).values({
+    id,
+    mockTestId: c.req.param("id"),
+    prompt: b.prompt,
+    optionA: b.optionA,
+    optionB: b.optionB,
+    optionC: b.optionC,
+    optionD: b.optionD,
+    correctAnswer: b.correctAnswer,
+    explanation: b.explanation,
+    marks: b.marks ?? 1,
+    position: b.position ?? 0,
   });
-  return c.json({ key });
+  return c.json({ id });
+});
+
+admin.post("/mock-tests/:id/questions/import", async (c) => {
+  const db = c.get("db");
+  const testId = c.req.param("id");
+  const { questions } = await c.req.json();
+  
+  if (!Array.isArray(questions) || questions.length === 0) {
+    return c.json({ error: "Invalid questions payload" }, 400);
+  }
+
+  // Get current max position
+  const existing = await db.select().from(mockQuestions).where(eq(mockQuestions.mockTestId, testId)).orderBy(desc(mockQuestions.position)).get();
+  let nextPos = existing ? existing.position + 1 : 0;
+
+  const toInsert = questions.map(q => ({
+    id: crypto.randomUUID(),
+    mockTestId: testId,
+    prompt: q.prompt,
+    optionA: q.optionA,
+    optionB: q.optionB,
+    optionC: q.optionC,
+    optionD: q.optionD,
+    correctAnswer: q.correctAnswer,
+    explanation: q.explanation || null,
+    marks: q.marks ? parseInt(q.marks) : 1,
+    position: nextPos++,
+  }));
+
+  await db.insert(mockQuestions).values(toInsert);
+  return c.json({ ok: true, imported: toInsert.length });
+});
+
+admin.delete("/mock-questions/:id", async (c) => {
+  await c.get("db").delete(mockQuestions).where(eq(mockQuestions.id, c.req.param("id")));
+  return c.json({ ok: true });
 });
 
 export default admin;

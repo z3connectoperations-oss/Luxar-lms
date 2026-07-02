@@ -21,8 +21,12 @@ const fmt = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString(und
 export default function Pathway() {
   const { courseId } = useParams();
   const [data, setData] = useState<PlayerData | null>(null);
+  const [mockTests, setMockTests] = useState<any[]>([]);
 
-  const load = () => api<PlayerData>(`/learn/courses/${courseId}`).then(setData).catch(() => setData(null));
+  const load = () => {
+    api<PlayerData>(`/learn/courses/${courseId}`).then(setData).catch(() => setData(null));
+    api<{ mockTests: any[] }>(`/learn/courses/${courseId}/mock-tests`).then(d => setMockTests(d.mockTests)).catch(() => setMockTests([]));
+  };
   useEffect(() => { load(); }, [courseId]);
 
   if (!data) return <div className="text-muted">Loading…</div>;
@@ -64,6 +68,7 @@ export default function Pathway() {
           const done = m.lessons.filter((l) => l.completed).length;
           const pct = total ? Math.round((done / total) * 100) : 0;
           const complete = total > 0 && done === total;
+          const mTest = mockTests.find(mt => mt.moduleId === m.id);
           return (
             <Card key={m.id} className="flex items-center gap-4">
               <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${complete ? "bg-emerald-600 text-white" : "bg-brand-50 text-brand-600"}`}>
@@ -80,9 +85,18 @@ export default function Pathway() {
                   <span className="shrink-0 text-xs font-medium text-muted">{done} / {total} lessons · {pct}%</span>
                 </div>
               </div>
-              <Button variant="outline" onClick={openPlayer} className="shrink-0">
-                <ExternalLink size={16} /> {complete ? "Review" : "Continue"}
-              </Button>
+              <div className="flex flex-col gap-2 items-end">
+                <Button variant="outline" onClick={openPlayer} className="shrink-0">
+                  <ExternalLink size={16} /> {complete ? "Review" : "Continue"}
+                </Button>
+                {mTest && (
+                  <Link to={`/student/mock-tests/${mTest.id}/intro`}>
+                    <Button size="sm" className="bg-brand-600 hover:bg-brand-700 text-white border-brand-600 hover:border-brand-700">
+                      Take Mock Test
+                    </Button>
+                  </Link>
+                )}
+              </div>
             </Card>
           );
         })}

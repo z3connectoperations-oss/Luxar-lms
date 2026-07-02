@@ -10,6 +10,7 @@ interface Row {
   name: string; email: string; phone: string | null;
   enrolledAt: string | null; expiryDate: string | null;
   progressPct: number; amountPaise: number; paymentStatus: string;
+  mockTestsCompleted?: number;
 }
 interface Detail {
   course: { id: string; title: string; slug: string; thumbnailR2Key: string | null; price: number | null; discountPrice: number | null };
@@ -46,12 +47,12 @@ export default function EnrollmentDetail() {
 
   const exportCsv = () => {
     if (!data) return;
-    const cols = ["#", "Name", "Email", "Phone", "Enrolled on", "Expiry", "Progress %", "Amount (INR)", "Status"];
+    const cols = ["#", "Name", "Email", "Phone", "Enrolled on", "Expiry", "Progress %", "Mock Tests", "Amount (INR)", "Status"];
     const escape = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const lines = [cols.join(",")].concat(
       filtered.map((r) => [
         r.sl, r.name, r.email, r.phone || "", fmt(r.enrolledAt), fmt(r.expiryDate),
-        r.progressPct, (r.amountPaise / 100).toFixed(2), r.paymentStatus,
+        r.progressPct, r.mockTestsCompleted || 0, (r.amountPaise / 100).toFixed(2), r.paymentStatus,
       ].map(escape).join(","))
     );
     const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
@@ -95,14 +96,14 @@ export default function EnrollmentDetail() {
         <table className="w-full border-collapse text-xs">
           <thead className="sticky top-0 z-10 bg-canvas text-left">
             <tr className="text-muted">
-              {["#", "Student name", "Email", "Phone", "Enrolled on", "Expiry date", "Progress", "Amount paid", "Status"].map((h) => (
+              {["#", "Student name", "Email", "Phone", "Enrolled on", "Expiry date", "Progress", "Mock Tests", "Amount paid", "Status"].map((h) => (
                 <th key={h} className="border-b border-r border-border px-3 py-2 font-semibold last:border-r-0">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={9} className="p-8 text-center text-muted">No enrollments match.</td></tr>
+              <tr><td colSpan={10} className="p-8 text-center text-muted">No enrollments match.</td></tr>
             ) : filtered.map((r) => (
               <tr key={r.enrollmentId} className="odd:bg-card even:bg-canvas hover:bg-brand-50/50">
                 <td className="border-b border-r border-border px-3 py-1.5 text-center font-medium text-muted">{r.sl}</td>
@@ -116,6 +117,9 @@ export default function EnrollmentDetail() {
                     <div className="h-1 w-16 overflow-hidden rounded-full bg-canvas"><div className="h-full bg-brand-500" style={{ width: `${Math.min(100, Math.max(0, r.progressPct))}%` }} /></div>
                     <span className="tabular-nums">{r.progressPct}%</span>
                   </div>
+                </td>
+                <td className="border-b border-r border-border px-3 py-1.5 text-muted text-center font-semibold">
+                  {r.mockTestsCompleted || 0}
                 </td>
                 <td className="border-b border-r border-border px-3 py-1.5 text-right font-medium text-ink tabular-nums">
                   {r.paymentStatus === "free" ? "Free" : formatINR(r.amountPaise)}

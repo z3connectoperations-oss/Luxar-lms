@@ -5,6 +5,7 @@ import { api, authHeaders } from "../../lib/api";
 import { cn } from "../../lib/cn";
 import { mediaUrl } from "../../lib/media";
 import { Button, Card, Input, Select, Textarea, Label, Chip } from "../../components/ui";
+import CourseMockTests from "./CourseMockTestsTab";
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:8787";
 
@@ -23,6 +24,7 @@ const DURATIONS = [
 const TABS = [
   { id: "details", label: "Details" },
   { id: "curriculum", label: "Curriculum" },
+  { id: "mock_tests", label: "Mock Tests" },
 ] as const;
 
 export default function CourseEdit() {
@@ -201,6 +203,9 @@ export default function CourseEdit() {
 
       {/* CURRICULUM */}
       {tab === "curriculum" && <Modules courseId={id!} modules={data.modules} reload={load} />}
+
+      {/* MOCK TESTS */}
+      {tab === "mock_tests" && <CourseMockTests courseId={id!} />}
     </div>
   );
 }

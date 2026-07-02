@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { eq, and, inArray, desc } from "drizzle-orm";
-import { enrollments, courses, modules, lessons, lessonProgress, courseTrainers, forumThreads, forumPosts, users, notifications, tests, questions, testAttempts, attemptAnswers, descriptiveSubmissions } from "@luxar/db";
+import { enrollments, courses, modules, lessons, lessonProgress, courseTrainers, forumThreads, forumPosts, users, notifications, tests, questions, testAttempts, attemptAnswers, descriptiveSubmissions, mockTests, mockQuestions, mockAttempts, mockAttemptAnswers } from "@luxar/db";
 import { requireAuth } from "../middleware";
 import { createNotification } from "../notify";
 import type { AppEnv } from "../types";
@@ -506,6 +506,187 @@ learn.post("/threads/:id/posts", async (c) => {
     });
   }
   return c.json({ ok: true });
+});
+
+// ---- Enterprise Mock Tests (Student View) -----------------------------------
+learn.get("/courses/:courseId/mock-tests", async (c) => {
+  const db = c.get("db");
+  const user = c.get("user")!;
+  const courseId = c.req.param("courseId");
+  if (!(await hasCourseAccess(db, user.id, user.role, courseId))) return c.json({ error: "forbidden" }, 403);
+  
+  const mTests = await db.select().from(mockTests).where(and(eq(mockTests.courseId, courseId), eq(mockTests.status, "published"))).all();
+  return c.json({ mockTests: mTests });
+});
+
+learn.post("/mock-tests/:id/attempt", async (c) => {
+  const db = c.get("db");
+  const user = c.get("user")!;
+  const testId = c.req.param("id");
+  
+  const test = await db.select().from(mockTests).where(eq(mockTests.id, testId)).get();
+  if (!test) return c.json({ error: "not found" }, 404);
+  if (!(await hasCourseAccess(db, user.id, user.role, test.courseId))) return c.json({ error: "forbidden" }, 403);
+
+  // Check attempt limits
+  const attempts = await db.select().from(mockAttempts).where(and(eq(mockAttempts.mockTestId, testId), eq(mockAttempts.userId, user.id))).all();
+  if (attempts.length >= test.maxAttempts) {
+    return c.json({ error: "Max attempts reached" }, 403);
+  }
+
+  // Resume if existing in-progress
+  const inProgress = attempts.find(a => a.status === "in_progress");
+  if (inProgress) return c.json({ attemptId: inProgress.id });
+
+  const attemptId = crypto.randomUUID();
+  await db.insert(mockAttempts).values({
+    id: attemptId,
+    userId: user.id,
+    mockTestId: testId,
+  });
+
+  return c.json({ attemptId });
+});
+
+learn.get("/mock-attempts/:id", async (c) => {
+  const db = c.get("db");
+  const user = c.get("user")!;
+  const attemptId = c.req.param("id");
+  
+  const attempt = await db.select().from(mockAttempts).where(eq(mockAttempts.id, attemptId)).get();
+  if (!attempt || attempt.userId !== user.id) return c.json({ error: "not found" }, 404);
+
+  const test = await db.select().from(mockTests).where(eq(mockTests.id, attempt.mockTestId)).get();
+  
+  // Return questions (without correct answers)
+  const qs = await db.select({
+    id: mockQuestions.id,
+    prompt: mockQuestions.prompt,
+    optionA: mockQuestions.optionA,
+    optionB: mockQuestions.optionB,
+    optionC: mockQuestions.optionC,
+    optionD: mockQuestions.optionD,
+    marks: mockQuestions.marks,
+    position: mockQuestions.position,
+  }).from(mockQuestions).where(eq(mockQuestions.mockTestId, attempt.mockTestId)).orderBy(mockQuestions.position).all();
+
+  // Return answers given so far
+  const ans = await db.select().from(mockAttemptAnswers).where(eq(mockAttemptAnswers.attemptId, attemptId)).all();
+  const answersMap: Record<string, string> = {};
+  ans.forEach(a => { if (a.selectedOption) answersMap[a.questionId] = a.selectedOption; });
+
+  return c.json({ attempt, test, questions: qs, answers: answersMap });
+});
+
+learn.patch("/mock-attempts/:id/save", async (c) => {
+  const db = c.get("db");
+  const user = c.get("user")!;
+  const attemptId = c.req.param("id");
+  const b = await c.req.json(); // { questionId, selectedOption, timeTakenSec }
+  
+  const attempt = await db.select().from(mockAttempts).where(eq(mockAttempts.id, attemptId)).get();
+  if (!attempt || attempt.userId !== user.id || attempt.status !== "in_progress") return c.json({ error: "invalid state" }, 400);
+
+  // Upsert answer
+  const existing = await db.select().from(mockAttemptAnswers).where(and(eq(mockAttemptAnswers.attemptId, attemptId), eq(mockAttemptAnswers.questionId, b.questionId))).get();
+  if (existing) {
+    await db.update(mockAttemptAnswers).set({ selectedOption: b.selectedOption }).where(eq(mockAttemptAnswers.id, existing.id));
+  } else {
+    await db.insert(mockAttemptAnswers).values({
+      id: crypto.randomUUID(), attemptId, questionId: b.questionId, selectedOption: b.selectedOption
+    });
+  }
+  
+  if (b.timeTakenSec) {
+    await db.update(mockAttempts).set({ timeTakenSec: b.timeTakenSec }).where(eq(mockAttempts.id, attemptId));
+  }
+
+  return c.json({ ok: true });
+});
+
+learn.post("/mock-attempts/:id/submit", async (c) => {
+  const db = c.get("db");
+  const user = c.get("user")!;
+  const attemptId = c.req.param("id");
+  
+  const attempt = await db.select().from(mockAttempts).where(eq(mockAttempts.id, attemptId)).get();
+  if (!attempt || attempt.userId !== user.id) return c.json({ error: "not found" }, 404);
+  if (attempt.status === "submitted") return c.json({ ok: true, attemptId });
+
+  const qs = await db.select().from(mockQuestions).where(eq(mockQuestions.mockTestId, attempt.mockTestId)).all();
+  const ans = await db.select().from(mockAttemptAnswers).where(eq(mockAttemptAnswers.attemptId, attemptId)).all();
+  
+  const ansMap = new Map(ans.map(a => [a.questionId, a]));
+
+  let score = 0;
+  let correctCount = 0;
+  let wrongCount = 0;
+  let skippedCount = 0;
+
+  for (const q of qs) {
+    const a = ansMap.get(q.id);
+    if (!a || !a.selectedOption) {
+      skippedCount++;
+    } else {
+      const isCorrect = a.selectedOption === q.correctAnswer;
+      await db.update(mockAttemptAnswers).set({ isCorrect }).where(eq(mockAttemptAnswers.id, a.id));
+      if (isCorrect) {
+        correctCount++;
+        score += q.marks;
+      } else {
+        wrongCount++;
+      }
+    }
+  }
+
+  await db.update(mockAttempts).set({
+    status: "submitted",
+    submittedAt: new Date(),
+    score,
+    correctCount,
+    wrongCount,
+    skippedCount
+  }).where(eq(mockAttempts.id, attemptId));
+
+  return c.json({ ok: true, attemptId });
+});
+
+learn.get("/mock-attempts/:id/result", async (c) => {
+  const db = c.get("db");
+  const user = c.get("user")!;
+  const attemptId = c.req.param("id");
+  
+  const attempt = await db.select().from(mockAttempts).where(eq(mockAttempts.id, attemptId)).get();
+  if (!attempt || attempt.userId !== user.id) return c.json({ error: "not found" }, 404);
+  
+  const test = await db.select().from(mockTests).where(eq(mockTests.id, attempt.mockTestId)).get();
+  const qs = await db.select().from(mockQuestions).where(eq(mockQuestions.mockTestId, attempt.mockTestId)).orderBy(mockQuestions.position).all();
+  const ans = await db.select().from(mockAttemptAnswers).where(eq(mockAttemptAnswers.attemptId, attemptId)).all();
+  
+  const totalMarks = qs.reduce((acc, q) => acc + q.marks, 0);
+
+  return c.json({ attempt, test, questions: qs, answers: ans, totalMarks });
+});
+
+learn.get("/my-mock-tests", async (c) => {
+  const db = c.get("db");
+  const user = c.get("user")!;
+  
+  const attempts = await db.select({
+    id: mockAttempts.id,
+    status: mockAttempts.status,
+    score: mockAttempts.score,
+    submittedAt: mockAttempts.submittedAt,
+    testTitle: mockTests.title,
+    passingPct: mockTests.passingPct,
+  })
+  .from(mockAttempts)
+  .innerJoin(mockTests, eq(mockAttempts.mockTestId, mockTests.id))
+  .where(eq(mockAttempts.userId, user.id))
+  .orderBy(desc(mockAttempts.startedAt))
+  .all();
+
+  return c.json({ attempts });
 });
 
 export default learn;

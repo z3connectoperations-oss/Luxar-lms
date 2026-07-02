@@ -407,6 +407,74 @@ export const descriptiveSubmissions = sqliteTable("descriptive_submissions", {
 });
 
 // ===========================================================================
+// ENTERPRISE MOCK TESTS (ISOLATED MODULE)
+// ===========================================================================
+export const mockTests = sqliteTable("mock_tests", {
+  id: id(),
+  courseId: text("course_id")
+    .notNull()
+    .references(() => courses.id),
+  moduleId: text("module_id")
+    .notNull()
+    .unique() // One mock test per module
+    .references(() => modules.id),
+  title: text("title").notNull(),
+  description: text("description"),
+  durationMin: integer("duration_min").notNull().default(60),
+  passingMarks: integer("passing_marks").notNull().default(40),
+  passingPct: integer("passing_pct").notNull().default(40),
+  maxAttempts: integer("max_attempts").notNull().default(3),
+  status: text("status").notNull().default("draft"), // draft | published
+  createdAt: createdAt(),
+});
+
+export const mockQuestions = sqliteTable("mock_questions", {
+  id: id(),
+  mockTestId: text("mock_test_id")
+    .notNull()
+    .references(() => mockTests.id),
+  prompt: text("prompt").notNull(),
+  optionA: text("option_a").notNull(),
+  optionB: text("option_b").notNull(),
+  optionC: text("option_c").notNull(),
+  optionD: text("option_d").notNull(),
+  correctAnswer: text("correct_answer").notNull(), // A | B | C | D
+  explanation: text("explanation"),
+  marks: integer("marks").notNull().default(1),
+  position: integer("position").notNull().default(0),
+});
+
+export const mockAttempts = sqliteTable("mock_attempts", {
+  id: id(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id),
+  mockTestId: text("mock_test_id")
+    .notNull()
+    .references(() => mockTests.id),
+  status: text("status").notNull().default("in_progress"), // in_progress | submitted
+  startedAt: createdAt(),
+  submittedAt: ts("submitted_at"),
+  score: integer("score").default(0),
+  correctCount: integer("correct_count").default(0),
+  wrongCount: integer("wrong_count").default(0),
+  skippedCount: integer("skipped_count").default(0),
+  timeTakenSec: integer("time_taken_sec").default(0),
+});
+
+export const mockAttemptAnswers = sqliteTable("mock_attempt_answers", {
+  id: id(),
+  attemptId: text("attempt_id")
+    .notNull()
+    .references(() => mockAttempts.id),
+  questionId: text("question_id")
+    .notNull()
+    .references(() => mockQuestions.id),
+  selectedOption: text("selected_option"), // A | B | C | D | null
+  isCorrect: bool("is_correct"),
+});
+
+// ===========================================================================
 // SCHEDULING, NOTIFICATIONS, ENGAGEMENT
 // ===========================================================================
 export const scheduleEvents = sqliteTable("schedule_events", {

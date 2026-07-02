@@ -109,6 +109,11 @@ checkout.post("/order", async (c) => {
     return c.json({ orderId: activeOrderId, amount: total, phonepeUrl: paymentRes.redirectUrl });
   }
 
+  // MOCK MODE FALLBACK FOR LOCAL TESTING
+  if (!c.env.PHONEPE_MERCHANT_ID) {
+    return c.json({ orderId: activeOrderId, amount: total, phonepeUrl: `/payment/result?transactionId=MOCK_${activeMerchantTransactionId}` });
+  }
+
   return c.json({ error: "Failed to initialize payment" }, 500);
 });
 
@@ -131,8 +136,16 @@ checkout.post("/product-order", async (c) => {
   }
   const total = Math.max(0, subtotal - discount);
 
+  const merchantTransactionId = `MT_${crypto.randomUUID().replace(/-/g, "").substring(0, 20)}`;
   const orderId = crypto.randomUUID();
-  await db.insert(orders).values({ id: orderId, userId: user.id, status: "created", subtotal, discount, total, couponId });
+  
+  await db.insert(orders).values({ 
+    id: orderId, userId: user.id, status: "created", 
+    subtotal, discount, total, couponId,
+    paymentProvider: "phonepe",
+    merchantTransactionId,
+    paymentStatus: "INITIATED"
+  });
   await db.insert(orderItems).values({ id: crypto.randomUUID(), orderId, kind: "product", productId: product.id, qty: 1, price: total });
   const paymentId = crypto.randomUUID();
   await db.insert(payments).values({ id: paymentId, orderId, status: "created", amount: total });
@@ -146,8 +159,25 @@ checkout.post("/product-order", async (c) => {
     });
   }
 
-  return c.json({ orderId, amount: total, mock: true });
-  return c.json({ orderId, amount: total, mock: true });
+  const provider = PaymentFactory.getProvider("phonepe");
+  const paymentRes = await provider.createPayment({
+    merchantTransactionId,
+    orderId,
+    userId: user.id,
+    amount: total,
+    mobileNumber: "9999999999"
+  }, c.env);
+
+  if (paymentRes?.redirectUrl) {
+    return c.json({ orderId, amount: total, phonepeUrl: paymentRes.redirectUrl });
+  }
+
+  // MOCK MODE FALLBACK FOR LOCAL TESTING
+  if (!c.env.PHONEPE_MERCHANT_ID) {
+    return c.json({ orderId, amount: total, phonepeUrl: `/payment/result?transactionId=MOCK_${merchantTransactionId}` });
+  }
+
+  return c.json({ error: "Failed to initialize payment" }, 500);
 });
 
 // Fulfilment: mark paid + create enrollment(s) + notify.
@@ -262,6 +292,11 @@ checkout.post("/course-order", async (c) => {
     return c.json({ orderId: activeOrderId, amount: total, phonepeUrl: paymentRes.redirectUrl });
   }
 
+  // MOCK MODE FALLBACK FOR LOCAL TESTING
+  if (!c.env.PHONEPE_MERCHANT_ID) {
+    return c.json({ orderId: activeOrderId, amount: total, phonepeUrl: `/payment/result?transactionId=MOCK_${activeMerchantTransactionId}` });
+  }
+
   return c.json({ error: "Failed to initialize payment" }, 500);
 });
 
@@ -354,6 +389,21 @@ checkout.get("/status/:merchantTransactionId", async (c) => {
   if (!order) return c.json({ error: "Order not found" }, 404);
 
   if (order.paymentVerified) {
+    return c.json({ status: "SUCCESS" });
+  }
+
+  // MOCK MODE FALLBACK
+  if (mId.startsWith("MOCK_") && !c.env.PHONEPE_MERCHANT_ID) {
+    await db.update(orders).set({
+      paymentStatus: "SUCCESS",
+      status: "paid",
+      paymentCompletedAt: new Date(),
+      paymentVerified: true
+    }).where(eq(orders.id, order.id));
+    
+    if (!order.paymentVerified) {
+      await fulfill(db, c.env, order.userId, order.id);
+    }
     return c.json({ status: "SUCCESS" });
   }
 
