@@ -20,15 +20,15 @@ const app = new Hono<AppEnv>();
 
 // CORS — allow the web app with credentials (cookies).
 // In dev, accept any localhost origin (5173 dev, 4173 preview, etc.); in prod,
-// fall back to the configured WEB_ORIGIN.
+// fall back to the configured CORS_ORIGIN.
 app.use("*", (c, next) =>
   cors({
     origin: (origin) => {
-      if (!origin) return c.env.WEB_ORIGIN || "http://localhost:5173";
+      if (!origin) return c.env.CORS_ORIGIN || "http://localhost:5173";
       if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return origin; // dev
       if (/\.pages\.dev$/.test(new URL(origin).hostname)) return origin; // Cloudflare Pages (prod + previews)
-      if (origin === c.env.WEB_ORIGIN) return origin; // configured production origin / custom domain
-      return c.env.WEB_ORIGIN || "http://localhost:5173";
+      if (origin === c.env.CORS_ORIGIN) return origin; // configured production origin / custom domain
+      return c.env.CORS_ORIGIN || "http://localhost:5173";
     },
     credentials: true,
   })(c, next)

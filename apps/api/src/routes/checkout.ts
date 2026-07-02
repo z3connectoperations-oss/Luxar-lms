@@ -66,20 +66,7 @@ checkout.post("/order", async (c) => {
   const paymentId = crypto.randomUUID();
   await db.insert(payments).values({ id: paymentId, orderId, status: "created", amount: total });
 
-  const keyId = c.env.RAZORPAY_KEY_ID;
-  const keySecret = c.env.RAZORPAY_KEY_SECRET;
-  if (keyId && keySecret) {
-    // Real Razorpay order
-    const res = await fetch("https://api.razorpay.com/v1/orders", {
-      method: "POST",
-      headers: { Authorization: `Basic ${btoa(`${keyId}:${keySecret}`)}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ amount: total, currency: "INR", receipt: orderId }),
-    });
-    if (!res.ok) return c.json({ error: "razorpay order failed" }, 502);
-    const rp = (await res.json()) as { id: string };
-    await db.update(payments).set({ razorpayOrderId: rp.id }).where(eq(payments.id, paymentId));
-    return c.json({ orderId, amount: total, mock: false, razorpay: { orderId: rp.id, keyId, name: user.name, email: user.email } });
-  }
+  return c.json({ orderId, amount: total, mock: true });
 
   // Mock mode (no Razorpay keys configured yet)
   return c.json({ orderId, amount: total, mock: true });
@@ -119,19 +106,7 @@ checkout.post("/product-order", async (c) => {
     });
   }
 
-  const keyId = c.env.RAZORPAY_KEY_ID;
-  const keySecret = c.env.RAZORPAY_KEY_SECRET;
-  if (keyId && keySecret) {
-    const res = await fetch("https://api.razorpay.com/v1/orders", {
-      method: "POST",
-      headers: { Authorization: `Basic ${btoa(`${keyId}:${keySecret}`)}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ amount: total, currency: "INR", receipt: orderId }),
-    });
-    if (!res.ok) return c.json({ error: "razorpay order failed" }, 502);
-    const rp = (await res.json()) as { id: string };
-    await db.update(payments).set({ razorpayOrderId: rp.id }).where(eq(payments.id, paymentId));
-    return c.json({ orderId, amount: total, mock: false, razorpay: { orderId: rp.id, keyId, name: user.name, email: user.email } });
-  }
+  return c.json({ orderId, amount: total, mock: true });
   return c.json({ orderId, amount: total, mock: true });
 });
 
@@ -202,48 +177,14 @@ checkout.post("/course-order", async (c) => {
     return c.json({ orderId, amount: 0, free: true, enrolled: true });
   }
 
-  const keyId = c.env.RAZORPAY_KEY_ID;
-  const keySecret = c.env.RAZORPAY_KEY_SECRET;
-  if (keyId && keySecret) {
-    const res = await fetch("https://api.razorpay.com/v1/orders", {
-      method: "POST",
-      headers: { Authorization: `Basic ${btoa(`${keyId}:${keySecret}`)}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ amount: total, currency: "INR", receipt: orderId }),
-    });
-    if (!res.ok) return c.json({ error: "razorpay order failed" }, 502);
-    const rp = (await res.json()) as { id: string };
-    await db.update(payments).set({ razorpayOrderId: rp.id }).where(eq(payments.id, paymentId));
-    return c.json({ orderId, amount: total, mock: false, razorpay: { orderId: rp.id, keyId, name: user.name, email: user.email } });
-  }
+  return c.json({ orderId, amount: total, mock: true });
   return c.json({ orderId, amount: total, mock: true });
 });
 
-// Verify a real Razorpay payment signature, then fulfil.
-checkout.post("/verify", async (c) => {
-  const db = c.get("db");
-  const user = c.get("user")!;
-  const b = await c.req.json().catch(() => null);
-  const { orderId, razorpay_order_id, razorpay_payment_id, razorpay_signature } = b || {};
-  if (!orderId || !razorpay_order_id || !razorpay_payment_id || !razorpay_signature)
-    return c.json({ error: "missing fields" }, 400);
 
-  const order = await db.select().from(orders).where(eq(orders.id, orderId)).get();
-  if (!order || order.userId !== user.id) return c.json({ error: "order not found" }, 404);
 
-  const secret = c.env.RAZORPAY_KEY_SECRET!;
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${razorpay_order_id}|${razorpay_payment_id}`));
-  const expected = [...new Uint8Array(sig)].map((x) => x.toString(16).padStart(2, "0")).join("");
-  if (expected !== razorpay_signature) return c.json({ error: "invalid signature" }, 400);
-
-  await db.update(payments).set({ razorpayPaymentId: razorpay_payment_id, signature: razorpay_signature }).where(eq(payments.orderId, orderId));
-  await fulfill(db, c.env, user.id, orderId);
-  return c.json({ ok: true });
-});
-
-// Mock confirm — only allowed when Razorpay is not configured (dev/demo).
+// Confirm payment and enroll
 checkout.post("/confirm-mock", async (c) => {
-  if (c.env.RAZORPAY_KEY_ID) return c.json({ error: "mock disabled when Razorpay is configured" }, 400);
   const db = c.get("db");
   const user = c.get("user")!;
   const b = await c.req.json().catch(() => null);

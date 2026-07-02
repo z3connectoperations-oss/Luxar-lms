@@ -7,13 +7,9 @@ export interface AppEnv {
   Bindings: {
     DB: D1Database;
     BUCKET: R2Bucket;
-    WEB_ORIGIN: string;
+    CORS_ORIGIN: string;
     FIREBASE_PROJECT_ID: string;
-    SESSION_SECRET: string;
-    // Optional until Razorpay is configured (mock checkout used when absent).
-    RAZORPAY_KEY_ID?: string;
-    RAZORPAY_KEY_SECRET?: string;
-    RAZORPAY_WEBHOOK_SECRET?: string;
+    JWT_SECRET: string;
     // Optional email (Resend). Email is skipped when absent.
     RESEND_API_KEY?: string;
     EMAIL_FROM?: string;

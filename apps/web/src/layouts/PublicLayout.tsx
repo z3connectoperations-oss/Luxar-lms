@@ -797,19 +797,20 @@ function Footer() {
           <div>
             <h4 className="text-xs font-bold uppercase tracking-widest text-gold-400">Contact</h4>
             <ul className="mt-5 space-y-3 text-sm text-white/60">
-              <li className="flex items-center gap-2"><Mail size={16} className="text-gold-400" /> luxaarinstitute@gmail.com</li>
-              <li className="flex items-center gap-2"><Phone size={16} className="text-gold-400" /> +91 9443241572</li>
-              <li className="flex items-start gap-2"><MapPin size={16} className="mt-0.5 shrink-0 text-gold-400" /> Kanyakumari, Tamilnadu</li>
+              <li className="flex items-center gap-2"><Mail size={16} className="shrink-0 text-gold-400" /> <a href="mailto:luxaarinstitute@gmail.com" className="transition hover:text-gold-400">luxaarinstitute@gmail.com</a></li>
+              <li className="flex items-center gap-2"><Phone size={16} className="shrink-0 text-gold-400" /> <a href="tel:+919443241572" className="transition hover:text-gold-400">+91 9443241572</a></li>
+              <li className="flex items-start gap-2"><MapPin size={16} className="mt-0.5 shrink-0 text-gold-400" /> <span>Kanyakumari, Tamilnadu</span></li>
             </ul>
           </div>
         </div>
 
         <div className="flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 sm:flex-row">
           <p className="text-sm text-white/40">© {new Date().getFullYear()} Luxaar Institute. All rights reserved.</p>
-          <div className="flex gap-6 text-sm text-white/40">
-            <Link to="/about" className="underline-offset-4 hover:text-white hover:underline">Privacy Policy</Link>
-            <Link to="/about" className="underline-offset-4 hover:text-white hover:underline">Terms of Service</Link>
-            <Link to="/about" className="underline-offset-4 hover:text-white hover:underline">Contact Us</Link>
+          <div className="flex flex-wrap justify-center gap-6 text-sm text-white/40">
+            <Link to="/privacy" className="underline-offset-4 hover:text-white hover:underline">Privacy Policy</Link>
+            <Link to="/terms" className="underline-offset-4 hover:text-white hover:underline">Terms of Service</Link>
+            <Link to="/refund-policy" className="underline-offset-4 hover:text-white hover:underline">Refund Policy</Link>
+            <Link to="/contact" className="underline-offset-4 hover:text-white hover:underline">Contact Us</Link>
           </div>
         </div>
       </div>

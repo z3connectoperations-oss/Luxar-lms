@@ -7,54 +7,9 @@ interface OrderResp {
   razorpay?: { orderId: string; keyId: string };
 }
 
-function loadScript(src: string) {
-  return new Promise<boolean>((resolve) => {
-    if (document.querySelector(`script[src="${src}"]`)) return resolve(true);
-    const s = document.createElement("script");
-    s.src = src;
-    s.onload = () => resolve(true);
-    s.onerror = () => resolve(false);
-    document.body.appendChild(s);
-  });
-}
-
-// Shared payment completion: Razorpay when configured, else mock confirm.
+// Complete checkout
 async function completePayment(order: OrderResp, user: { name: string; email: string }): Promise<void> {
-  if (order.mock || !order.razorpay) {
-    await api("/checkout/confirm-mock", { method: "POST", body: JSON.stringify({ orderId: order.orderId }) });
-    return;
-  }
-  const ok = await loadScript("https://checkout.razorpay.com/v1/checkout.js");
-  if (!ok) throw new Error("Failed to load Razorpay");
-  await new Promise<void>((resolve, reject) => {
-    const rzp = new (window as any).Razorpay({
-      key: order.razorpay!.keyId,
-      amount: order.amount,
-      currency: "INR",
-      name: "Luxaar Institute",
-      order_id: order.razorpay!.orderId,
-      prefill: { name: user.name, email: user.email },
-      theme: { color: "#16130F" },
-      handler: async (resp: any) => {
-        try {
-          await api("/checkout/verify", {
-            method: "POST",
-            body: JSON.stringify({
-              orderId: order.orderId,
-              razorpay_order_id: resp.razorpay_order_id,
-              razorpay_payment_id: resp.razorpay_payment_id,
-              razorpay_signature: resp.razorpay_signature,
-            }),
-          });
-          resolve();
-        } catch (e) {
-          reject(e);
-        }
-      },
-      modal: { ondismiss: () => reject(new Error("Payment cancelled")) },
-    });
-    rzp.open();
-  });
+  await api("/checkout/confirm-mock", { method: "POST", body: JSON.stringify({ orderId: order.orderId }) });
 }
 
 /** Enroll in a course variant (creates order + pays + grants access). */

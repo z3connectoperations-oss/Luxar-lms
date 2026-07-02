@@ -9,6 +9,9 @@ import Courses from "./pages/Courses";
 import CourseDetail from "./pages/CourseDetail";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
+import RefundPolicy from "./pages/RefundPolicy";
 import { StudentDashboard, TrainerDashboard } from "./pages/dashboards";
 import MyCourses from "./pages/student/MyCourses";
 import Pathway from "./pages/student/Pathway";
@@ -53,6 +56,9 @@ export default function App() {
             <Route path="/courses/:slug" element={<CourseDetail />} />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/refund-policy" element={<RefundPolicy />} />
           </Route>
           <Route path="/login" element={<Navigate to="/?login=true" replace />} />
           <Route path="/signup" element={<Signup />} />
