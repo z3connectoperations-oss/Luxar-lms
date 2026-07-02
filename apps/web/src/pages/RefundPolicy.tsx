@@ -29,7 +29,7 @@ export default function RefundPolicy() {
         </ul>
         
         <p>
-          In the rare event that Luxaar Institute cancels a course or batch, you will be offered a full refund or the option to switch to an equivalent course.
+          In the rare event that Luxaar Institute (A unit of SABI CONSTRUCTION) cancels a course or batch, you will be offered a full refund or the option to switch to an equivalent course.
         </p>
         
         <p>

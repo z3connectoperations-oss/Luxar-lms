@@ -84,8 +84,13 @@ export default function Contact() {
                   <MapPin size={24} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-ink">Visit Us</h3>
-                  <p className="mt-1 text-muted">Kanyakumari, Tamilnadu</p>
+                  <h3 className="font-bold text-ink">Registered Office</h3>
+                  <p className="mt-1 text-muted text-sm leading-relaxed">
+                    <strong>Luxaar Institute (A unit of SABI CONSTRUCTION)</strong><br />
+                    14/2/5, 14, 5F-3 MOOLACHEL,<br />
+                    VERKILAMBI, KANYAKUMARI,<br />
+                    TAMIL NADU, 629166
+                  </p>
                 </div>
               </div>
             </div>
