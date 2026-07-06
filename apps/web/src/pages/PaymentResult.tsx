@@ -6,6 +6,7 @@ export default function PaymentResult() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [status, setStatus] = useState<"LOADING" | "SUCCESS" | "FAILED">("LOADING");
+  const [orderKind, setOrderKind] = useState<string>("course");
   const merchantTransactionId = searchParams.get("transactionId");
 
   useEffect(() => {
@@ -17,12 +18,19 @@ export default function PaymentResult() {
     let attempts = 0;
     const maxAttempts = 5;
 
-    const checkStatus = async () => {
+      const checkStatus = async () => {
       try {
-        const res = await api<{ status: string }>(`/checkout/status/${merchantTransactionId}`);
+        const res = await api<{ status: string; kind?: string }>(`/checkout/status/${merchantTransactionId}`);
         if (res.status === "SUCCESS") {
           setStatus("SUCCESS");
-          setTimeout(() => navigate("/student"), 3000);
+          if (res.kind) setOrderKind(res.kind);
+          setTimeout(() => {
+            if (res.kind === "test-series") {
+              navigate("/student/test-series");
+            } else {
+              navigate("/student");
+            }
+          }, 3000);
         } else if (res.status === "PENDING" && attempts < maxAttempts) {
           attempts++;
           setTimeout(checkStatus, attempts === 1 ? 5000 : 10000);
@@ -61,7 +69,9 @@ export default function PaymentResult() {
               </svg>
             </div>
             <h2 className="text-2xl font-bold text-ink">Payment Successful!</h2>
-            <p className="text-muted">Your course has been unlocked. Redirecting you to the dashboard...</p>
+            <p className="text-muted">
+              Your {orderKind === "test-series" ? "test series" : "course"} has been unlocked. Redirecting you to the dashboard...
+            </p>
           </div>
         )}
 

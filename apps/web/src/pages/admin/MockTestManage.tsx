@@ -74,7 +74,7 @@ export default function MockTestManage() {
             ← Back to Course
           </Link>
           <h1 className="truncate text-lg font-bold text-ink">{module.title} Mock Test</h1>
-          {testId && <Chip tone={form.status === "published" ? "emerald" : "yellow"}>{form.status}</Chip>}
+          {testId && <Chip tone={form.status === "published" ? "success" : "yellow"}>{form.status}</Chip>}
         </div>
         <div className="flex items-center gap-3">
           {saved && <span className="text-sm font-medium text-emerald-700">✓ Saved</span>}

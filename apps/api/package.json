@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
+    "dev:remote": "wrangler dev --remote",
     "deploy": "wrangler deploy",
     "migrate:local": "wrangler d1 migrations apply luxar-lms --local",
     "migrate:remote": "wrangler d1 migrations apply luxar-lms --remote",

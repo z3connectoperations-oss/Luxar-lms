@@ -112,11 +112,9 @@ export default function MockTestQuestions({ testId }: { testId: string }) {
           <Button size="sm" variant="outline" onClick={downloadTemplate}>Download Template</Button>
           <div>
             <input type="file" accept=".csv" id="csv-upload" className="hidden" onChange={handleFileUpload} disabled={importing} />
-            <label htmlFor="csv-upload">
-              <Button size="sm" variant="outline" asChild disabled={importing}>
-                <span className="cursor-pointer">{importing ? "Importing..." : "Import CSV"}</span>
-              </Button>
-            </label>
+            <Button size="sm" variant="outline" disabled={importing} onClick={() => document.getElementById('csv-upload')?.click()}>
+              {importing ? "Importing..." : "Import CSV"}
+            </Button>
           </div>
           <Button size="sm" onClick={() => setShowForm(!showForm)}>
             {showForm ? "Cancel" : "Add Question"}

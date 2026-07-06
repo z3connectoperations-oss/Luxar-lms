@@ -656,3 +656,96 @@ export const liveParticipants = sqliteTable("live_participants", {
   joinedAt: createdAt(),
   leftAt: ts("left_at"),
 });
+
+// ===========================================================================
+// STANDALONE TEST SERIES (ISOLATED MODULE)
+// ===========================================================================
+
+export const testSeries = sqliteTable("test_series", {
+  id: id(),
+  title: text("title").notNull(),
+  slug: text("slug").notNull().unique(),
+  descriptionMd: text("description_md"),
+  thumbnailR2Key: text("thumbnail_r2_key"),
+  bannerR2Key: text("banner_r2_key"),
+  price: integer("price").notNull().default(0), // paise
+  discountPrice: integer("discount_price"), // paise
+  validityDays: integer("validity_days").notNull().default(365),
+  status: text("status").notNull().default("draft"), // draft | published
+  position: integer("position").default(0),
+  isFeatured: bool("is_featured").default(false),
+  createdAt: createdAt(),
+});
+
+export const testSeriesTests = sqliteTable("test_series_tests", {
+  id: id(),
+  testSeriesId: text("test_series_id")
+    .notNull()
+    .references(() => testSeries.id),
+  title: text("title").notNull(),
+  durationMin: integer("duration_min").notNull().default(60),
+  passingMarks: integer("passing_marks").notNull().default(40),
+  passingPct: integer("passing_pct").notNull().default(40),
+  maxAttempts: integer("max_attempts").notNull().default(3),
+  position: integer("position").notNull().default(0),
+  status: text("status").notNull().default("draft"), // draft | published
+});
+
+export const testSeriesQuestions = sqliteTable("test_series_questions", {
+  id: id(),
+  testId: text("test_id")
+    .notNull()
+    .references(() => testSeriesTests.id),
+  prompt: text("prompt").notNull(),
+  optionA: text("option_a").notNull(),
+  optionB: text("option_b").notNull(),
+  optionC: text("option_c").notNull(),
+  optionD: text("option_d").notNull(),
+  correctAnswer: text("correct_answer").notNull(), // A | B | C | D
+  explanation: text("explanation"),
+  marks: integer("marks").notNull().default(1),
+  position: integer("position").notNull().default(0),
+});
+
+export const testSeriesEnrollments = sqliteTable("test_series_enrollments", {
+  id: id(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id),
+  testSeriesId: text("test_series_id")
+    .notNull()
+    .references(() => testSeries.id),
+  purchaseDate: createdAt(),
+  expiryDate: ts("expiry_date"),
+});
+
+export const testSeriesAttempts = sqliteTable("test_series_attempts", {
+  id: id(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id),
+  testId: text("test_id")
+    .notNull()
+    .references(() => testSeriesTests.id),
+  status: text("status").notNull().default("in_progress"), // in_progress | submitted
+  startedAt: createdAt(),
+  submittedAt: ts("submitted_at"),
+  score: integer("score").default(0),
+  correctCount: integer("correct_count").default(0),
+  wrongCount: integer("wrong_count").default(0),
+  skippedCount: integer("skipped_count").default(0),
+  timeTakenSec: integer("time_taken_sec").default(0),
+  facultyFeedbackMd: text("faculty_feedback_md"),
+});
+
+export const testSeriesAttemptAnswers = sqliteTable("test_series_attempt_answers", {
+  id: id(),
+  attemptId: text("attempt_id")
+    .notNull()
+    .references(() => testSeriesAttempts.id),
+  questionId: text("question_id")
+    .notNull()
+    .references(() => testSeriesQuestions.id),
+  selectedOption: text("selected_option"), // A | B | C | D | null
+  isCorrect: bool("is_correct"),
+});

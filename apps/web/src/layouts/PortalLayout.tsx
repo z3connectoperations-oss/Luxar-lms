@@ -3,7 +3,7 @@ import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   GraduationCap, LayoutDashboard, BookOpen, CalendarDays, ClipboardCheck,
   Award, Users, Mic, ShoppingBag, MessageSquare, Globe, Download,
-  Bell, LogOut, LayoutGrid, Menu, X, type LucideIcon,
+  Bell, LogOut, LayoutGrid, Menu, X, Target, type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { api } from "../lib/api";
@@ -15,6 +15,7 @@ const NAV: Record<string, Item[]> = {
   student: [
     { label: "Dashboard", to: "/student", icon: LayoutDashboard },
     { label: "My Courses", to: "/student/courses", icon: BookOpen },
+    { label: "My Test Series", to: "/student/test-series", icon: Target },
     { label: "Downloads", to: "/student/downloads", icon: Download },
     { label: "Schedule", to: "/student/schedule", icon: CalendarDays },
     { label: "Purchases", to: "/student/purchases", icon: ShoppingBag },
@@ -32,8 +33,10 @@ const NAV: Record<string, Item[]> = {
     { label: "Dashboard", to: "/admin", icon: LayoutDashboard },
     { label: "Categories", to: "/admin/categories", icon: LayoutGrid },
     { label: "Courses", to: "/admin/courses", icon: BookOpen },
+    { label: "Test Series", to: "/admin/test-series", icon: Target },
     { label: "Users", to: "/admin/users", icon: Users },
     { label: "Enrolled Courses", to: "/admin/enrollments", icon: GraduationCap },
+    { label: "Enrolled Test Series", to: "/admin/enrollments/test-series", icon: Target },
     { label: "Leads", to: "/admin/leads", icon: MessageSquare },
   ],
 };

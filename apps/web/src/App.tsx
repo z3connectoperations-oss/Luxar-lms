@@ -45,9 +45,23 @@ import AdminCourseEdit from "./pages/admin/CourseEdit";
 import AdminUsers from "./pages/admin/Users";
 import AdminEnrollments from "./pages/admin/Enrollments";
 import AdminEnrollmentDetail from "./pages/admin/EnrollmentDetail";
+import AdminTestSeriesEnrollments from "./pages/admin/TestSeriesEnrollments";
+import AdminTestSeriesEnrollmentDetail from "./pages/admin/TestSeriesEnrollmentDetail";
 import AdminLeads from "./pages/admin/Leads";
 import AdminExams from "./pages/admin/Exams";
 import AdminMockTestManage from "./pages/admin/MockTestManage";
+
+// Standalone Test Series
+import TestSeriesCatalog from "./pages/test-series/TestSeriesCatalog";
+import TestSeriesDetail from "./pages/test-series/TestSeriesDetail";
+import MyTestSeries from "./pages/student/test-series/MyTestSeries";
+import TestSeriesPathway from "./pages/student/test-series/TestSeriesPathway";
+import StandaloneTestPlayer from "./pages/student/test-series/StandaloneTestPlayer";
+import StandaloneTestResult from "./pages/student/test-series/StandaloneTestResult";
+import AdminTestSeriesList from "./pages/admin/test-series/TestSeriesList";
+import AdminTestSeriesEdit from "./pages/admin/test-series/TestSeriesEdit";
+import AdminTestSeriesTests from "./pages/admin/test-series/TestSeriesTests";
+import AdminTestSeriesQuestions from "./pages/admin/test-series/TestSeriesQuestions";
 
 export default function App() {
   return (
@@ -59,6 +73,8 @@ export default function App() {
             <Route path="/" element={<Landing />} />
             <Route path="/courses" element={<Courses />} />
             <Route path="/courses/:slug" element={<CourseDetail />} />
+            <Route path="/test-series" element={<TestSeriesCatalog />} />
+            <Route path="/test-series/:slug" element={<TestSeriesDetail />} />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/terms" element={<Terms />} />
@@ -92,6 +108,10 @@ export default function App() {
             <Route path="/student/tests" element={<Tests />} />
             <Route path="/student/tests/:testId/take" element={<TestPlayer />} />
             <Route path="/student/tests/result/:attemptId" element={<TestResult />} />
+            <Route path="/student/test-series" element={<MyTestSeries />} />
+            <Route path="/student/test-series/:id" element={<TestSeriesPathway />} />
+            <Route path="/student/test-series/tests/:testId/take" element={<StandaloneTestPlayer />} />
+            <Route path="/student/test-series/attempts/:attemptId/result" element={<StandaloneTestResult />} />
             <Route path="/student/mock-tests/:id/intro" element={<MockTestIntro />} />
             <Route path="/student/mock-attempts/:id" element={<MockTestPlayer />} />
             <Route path="/student/mock-attempts/:id/result" element={<MockTestResult />} />
@@ -131,11 +151,18 @@ export default function App() {
             <Route path="/admin/categories" element={<AdminCategories />} />
             <Route path="/admin/courses" element={<AdminCourses />} />
             <Route path="/admin/courses/:id" element={<AdminCourseEdit />} />
+            <Route path="/admin/test-series" element={<AdminTestSeriesList />} />
+            <Route path="/admin/test-series/new" element={<AdminTestSeriesEdit />} />
+            <Route path="/admin/test-series/:id" element={<AdminTestSeriesEdit />} />
+            <Route path="/admin/test-series/:id/tests" element={<AdminTestSeriesTests />} />
+            <Route path="/admin/test-series/:id/tests/:testId/questions" element={<AdminTestSeriesQuestions />} />
             <Route path="/admin/modules/:moduleId/mock-test" element={<AdminMockTestManage />} />
             <Route path="/admin/exams" element={<AdminExams />} />
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/enrollments" element={<AdminEnrollments />} />
             <Route path="/admin/enrollments/:courseId" element={<AdminEnrollmentDetail />} />
+            <Route path="/admin/enrollments/test-series" element={<AdminTestSeriesEnrollments />} />
+            <Route path="/admin/enrollments/test-series/:id" element={<AdminTestSeriesEnrollmentDetail />} />
             <Route path="/admin/leads" element={<AdminLeads />} />
             <Route path="/admin/notifications" element={<Notifications />} />
           </Route>

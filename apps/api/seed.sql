@@ -20,7 +20,7 @@ INSERT OR IGNORE INTO course_variants (id, course_id, label, format, price_mrp, 
 
 INSERT OR IGNORE INTO cms_blocks (id, key, type, data_json, position, published) VALUES
   ('cms-hero', 'hero', 'hero',
-   '{"title":"Education that Inspires","subtitle":"India''s platform for RBI, SEBI & NABARD exam prep","ctaText":"Explore Courses","ctaHref":"/courses"}', 0, 1),
+   '{"title":"Education that Inspires","subtitle":"India''s platform for RBI, SEBI & TNPSC exam prep","ctaText":"Explore Courses","ctaHref":"/courses"}', 0, 1),
   ('cms-about', 'about', 'about',
    '{"heading":"Why Luxar LMS","body":"Structured video courses, mock tests, live mentorship and 24x7 doubt support."}', 1, 1),
   ('cms-featured', 'featured', 'featured',
@@ -46,7 +46,7 @@ INSERT OR IGNORE INTO questions (id, test_id, type, prompt_md, options_json, cor
 
 INSERT OR IGNORE INTO current_affairs_posts (id, date, kind, title, body_md, topic) VALUES
   ('ca-1', '2026-05-27', 'daily', 'RBI keeps repo rate unchanged', 'The Reserve Bank of India kept the repo rate steady at its latest MPC meeting, balancing growth and inflation concerns.', 'Economy'),
-  ('ca-2', '2026-05-01', 'monthly', 'May 2026 — Monthly Compilation', 'A roundup of the month''s key economic and banking developments relevant to RBI/SEBI/NABARD aspirants.', 'Compilation');
+  ('ca-2', '2026-05-01', 'monthly', 'May 2026 — Monthly Compilation', 'A roundup of the month''s key economic and banking developments relevant to RBI/SEBI/TNPSC aspirants.', 'Compilation');
 
 INSERT OR IGNORE INTO products (id, type, title, slug, price, stock) VALUES
   ('prod-1', 'physical', 'RBI Grade B Phase 1 Book', 'rbi-phase-1-book', 59900, 100),
@@ -62,7 +62,7 @@ INSERT OR IGNORE INTO toppers (id, name, exam, year, quote_md) VALUES
 
 -- Reset the hero block to clean copy (in case it was edited during testing).
 UPDATE cms_blocks SET data_json =
-  '{"title":"Crack India''s toughest exams with confidence","subtitle":"Structured video courses, thousands of practice questions, live classes and 1:1 mentorship — for RBI, SEBI, NABARD, UPSC and more."}'
+  '{"title":"Crack India''s toughest exams with confidence","subtitle":"Structured video courses, thousands of practice questions, live classes and 1:1 mentorship — for RBI, SEBI, TNPSC, UPSC and more."}'
   WHERE key = 'hero';
 
 -- Cover images for the two original courses
@@ -110,3 +110,39 @@ INSERT OR IGNORE INTO toppers (id, name, exam, year, quote_md) VALUES
 INSERT OR IGNORE INTO current_affairs_posts (id, date, kind, title, body_md, topic) VALUES
   ('ca-3', '2026-05-26', 'daily', 'Govt launches new MSME credit scheme', 'A new collateral-free credit guarantee scheme for MSMEs was announced to boost small-business lending.', 'Economy'),
   ('ca-4', '2026-05-25', 'daily', 'SEBI tightens disclosure norms for IPOs', 'Market regulator SEBI introduced stricter disclosure requirements for upcoming public issues.', 'Markets');
+
+-- =====================================================================
+--  TEST SERIES DEMO CONTENT (TNPSC)
+-- =====================================================================
+INSERT OR IGNORE INTO test_series (id, title, slug, description_md, price, discount_price, validity_days, status, position, is_featured, created_at) VALUES
+  ('ts-tnpsc-1', 'TNPSC Group 4 Full Mock Test Series', 'tnpsc-group-4', 'Complete mock test series for TNPSC Group 4 aspirants covering General Tamil and General Studies.', 49900, 29900, 365, 'published', 1, 1, strftime('%s','now'));
+
+INSERT OR IGNORE INTO test_series_tests (id, test_series_id, title, duration_min, passing_marks, passing_pct, max_attempts, position, status) VALUES
+  ('ts-t-tnpsc-1', 'ts-tnpsc-1', 'TNPSC Group 4 Mock Test 1 - General Tamil', 180, 90, 30, 3, 0, 'published'),
+  ('ts-t-tnpsc-2', 'ts-tnpsc-1', 'TNPSC Group 4 Mock Test 2 - General Studies', 180, 90, 30, 3, 1, 'published');
+
+INSERT OR IGNORE INTO test_series_questions (id, test_id, prompt, option_a, option_b, option_c, option_d, correct_answer, explanation, marks, position) VALUES
+  ('ts-q-tnpsc-1', 'ts-t-tnpsc-1', 'Which is the oldest Tamil grammar work?', 'Tolkappiyam', 'Silappatikaram', 'Manimekalai', 'Tirukkural', 'A', 'Tolkappiyam is the oldest surviving Tamil grammar text.', 1, 0),
+  ('ts-q-tnpsc-2', 'ts-t-tnpsc-1', 'Who authored Tirukkural?', 'Ilango Adigal', 'Kambar', 'Thiruvalluvar', 'Avvaiyar', 'C', 'Thiruvalluvar is the author of Tirukkural.', 1, 1),
+  ('ts-q-tnpsc-3', 'ts-t-tnpsc-2', 'Who was the first Chief Minister of Tamil Nadu after independence?', 'K. Kamaraj', 'O. P. Ramaswamy Reddiyar', 'C. N. Annadurai', 'C. Rajagopalachari', 'B', 'O. P. Ramaswamy Reddiyar was the first Chief Minister of Madras Presidency after independence.', 1, 0),
+  ('ts-q-tnpsc-4', 'ts-t-tnpsc-2', 'Which river is known as the Ganges of South India?', 'Godavari', 'Krishna', 'Kaveri', 'Tungabhadra', 'C', 'Kaveri is often referred to as the Dakshina Ganga or Ganges of the South.', 1, 1),
+  ('ts-q-tnpsc-5', 'ts-t-tnpsc-1', 'What is the total number of chapters in Tirukkural?', '100', '133', '150', '200', 'B', 'Tirukkural contains 133 chapters (Adhikarams).', 1, 2),
+  ('ts-q-tnpsc-6', 'ts-t-tnpsc-1', 'Which epic is considered the twin of Silappatikaram?', 'Manimekalai', 'Valayapathi', 'Kundalakesi', 'Jivaka Chintamani', 'A', 'Manimekalai and Silappatikaram are considered twin epics in Tamil literature.', 1, 3),
+  ('ts-q-tnpsc-7', 'ts-t-tnpsc-1', 'Who is the author of Manimekalai?', 'Ilango Adigal', 'Seethalai Sathanar', 'Kambar', 'Avvaiyar', 'B', 'Manimekalai was authored by Seethalai Sathanar.', 1, 4),
+  ('ts-q-tnpsc-8', 'ts-t-tnpsc-1', 'What is the grammatical text "Nannūl" about?', 'Literature', 'Tamil Grammar', 'Mathematics', 'Medicine', 'B', 'Nannūl is a prominent work on Tamil grammar authored by Pavanandi Munivar.', 1, 5),
+  ('ts-q-tnpsc-9', 'ts-t-tnpsc-1', 'How many poems does Purananuru contain?', '100', '200', '300', '400', 'D', 'Purananuru is an anthology of 400 poetic verses.', 1, 6),
+  ('ts-q-tnpsc-10', 'ts-t-tnpsc-1', 'Which Chola king built the Brihadisvara Temple?', 'Rajendra Chola I', 'Rajaraja Chola I', 'Karikala Chola', 'Parantaka I', 'B', 'Rajaraja Chola I built the Brihadisvara Temple at Thanjavur.', 1, 7),
+  ('ts-q-tnpsc-11', 'ts-t-tnpsc-1', 'Bharathidasan is a famous poet known as?', 'Puratchi Kavingnar', 'Kavimani', 'Makkal Kavingnar', 'Namakkal Kavingnar', 'A', 'Bharathidasan is hailed as Puratchi Kavingnar (Revolutionary Poet).', 1, 8),
+  ('ts-q-tnpsc-12', 'ts-t-tnpsc-1', 'The Tamil months are based on?', 'Solar calendar', 'Lunar calendar', 'Lunisolar calendar', 'Gregorian calendar', 'A', 'The Tamil calendar is a sidereal solar calendar.', 1, 9),
+  ('ts-q-tnpsc-13', 'ts-t-tnpsc-1', 'Which Sangam literature is a collection of love poems?', 'Akananuru', 'Purananuru', 'Pathitrupathu', 'Paripadal', 'A', 'Akananuru deals entirely with akam (inner life/love).', 1, 10),
+  ('ts-q-tnpsc-14', 'ts-t-tnpsc-1', 'In Tamil grammar, how many types of thinai (landscapes) are there?', '3', '4', '5', '6', 'C', 'The five landscapes are Kurinji, Mullai, Marutham, Neithal, and Palai.', 1, 11),
+  ('ts-q-tnpsc-15', 'ts-t-tnpsc-1', 'Who composed the National Anthem of India?', 'Bharathiyar', 'Rabindranath Tagore', 'Bankim Chandra', 'Subramaniya Siva', 'B', 'Rabindranath Tagore composed the National Anthem.', 1, 12),
+  ('ts-q-tnpsc-16', 'ts-t-tnpsc-1', 'What was the real name of V.O. Chidambaram Pillai?', 'Vallinayagan Olaganathan Chidambaram', 'Veerapandiya Kattabomman', 'Venkataraman', 'Viswanathan', 'A', 'V.O.C stands for Vallinayagan Olaganathan Chidambaram.', 1, 13),
+  ('ts-q-tnpsc-17', 'ts-t-tnpsc-1', 'Which is the classical dance form of Tamil Nadu?', 'Kathak', 'Bharatanatyam', 'Kuchipudi', 'Odissi', 'B', 'Bharatanatyam is the classical dance form originating in Tamil Nadu.', 1, 14),
+  ('ts-q-tnpsc-18', 'ts-t-tnpsc-1', 'Kambar translated the Ramayana into Tamil as?', 'Kamba Ramayanam', 'Iramavataram', 'Tamil Ramayanam', 'Valmiki Ramayanam', 'B', 'Kambar originally called his work Iramavataram.', 1, 15),
+  ('ts-q-tnpsc-19', 'ts-t-tnpsc-1', 'Who is known as the "Father of the Tamil Renaissance"?', 'C. W. Thamotharampillai', 'U. V. Swaminatha Iyer', 'Maraimalai Adigal', 'Arumuka Navalar', 'C', 'Maraimalai Adigal is often called the Father of the Tamil Renaissance for his Pure Tamil movement.', 1, 16),
+  ('ts-q-tnpsc-20', 'ts-t-tnpsc-1', 'What does the term "Ettuthokai" refer to?', 'Eight Anthologies', 'Ten Idylls', 'Eighteen Lesser Texts', 'Five Great Epics', 'A', 'Ettuthokai translates to the Eight Anthologies in Sangam literature.', 1, 17),
+  ('ts-q-tnpsc-21', 'ts-t-tnpsc-1', 'Which Tamil king defeated the Cheras and Pandyas at the Battle of Venni?', 'Rajaraja Chola', 'Karikala Chola', 'Rajendra Chola', 'Nedunjeliyan', 'B', 'Karikala Chola was victorious at the historic Battle of Venni.', 1, 18),
+  ('ts-q-tnpsc-22', 'ts-t-tnpsc-1', 'Which text is part of Pathinenkilkanakku?', 'Purananuru', 'Tirukkural', 'Silappatikaram', 'Akananuru', 'B', 'Tirukkural is the most famous of the Eighteen Lesser Texts (Pathinenkilkanakku).', 1, 19),
+  ('ts-q-tnpsc-23', 'ts-t-tnpsc-1', 'The ancient port city of the Cholas was?', 'Madurai', 'Kanchipuram', 'Puhar (Kaveripoompattinam)', 'Uraiyur', 'C', 'Puhar was the major port city of the Early Cholas.', 1, 20),
+  ('ts-q-tnpsc-24', 'ts-t-tnpsc-1', 'Who was the first woman doctor in Tamil Nadu?', 'Dr. Muthulakshmi Reddy', 'Moovalur Ramamirtham', 'Dr. Annie Besant', 'Rukmini Devi', 'A', 'Dr. Muthulakshmi Reddy was the first woman medical practitioner in India.', 1, 21);

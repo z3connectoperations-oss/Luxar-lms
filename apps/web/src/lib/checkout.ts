@@ -36,3 +36,13 @@ export async function enrollInCourse(courseId: string, couponCode: string | unde
   if (order.free) return; // server already created the enrollment
   await completePayment(order);
 }
+
+/** Enroll directly in a Test Series. Free test series enroll instantly. */
+export async function enrollInTestSeries(testSeriesId: string) {
+  const order = await api<OrderResp>("/checkout/test-series-order", {
+    method: "POST",
+    body: JSON.stringify({ testSeriesId }),
+  });
+  if (order.free) return; // server already created the enrollment
+  await completePayment(order);
+}

@@ -26,6 +26,7 @@ import { cn } from "../lib/cn";
 
 const navItems = [
   { to: "/courses", label: "Courses" },
+  { to: "/test-series", label: "Test Series" },
   { to: "/about", label: "About" },
 ];
 

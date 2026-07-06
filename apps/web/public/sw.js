@@ -34,7 +34,7 @@ self.addEventListener("fetch", (e) => {
           caches.open(CACHE).then((c) => c.put("/index.html", copy)).catch(() => {});
           return res;
         })
-        .catch(() => caches.match("/index.html").then((r) => r || caches.match("/")))
+        .catch(() => caches.match("/index.html").then((r) => r || caches.match("/")).then((r) => r || new Response("Offline", { status: 503 })))
     );
     return;
   }
@@ -52,7 +52,7 @@ self.addEventListener("fetch", (e) => {
           }
           return res;
         })
-        .catch(() => cached);
+        .catch(() => cached || new Response("Network error", { status: 503 }));
     })
   );
 });

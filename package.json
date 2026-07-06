@@ -10,12 +10,14 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:remote": "concurrently \"npm run dev:api:remote\" \"npm run dev:web\"",
     "dev:api": "npm run dev --workspace @luxar/api",
+    "dev:api:remote": "npm run dev:remote --workspace @luxar/api",
     "dev:web": "npm run dev --workspace @luxar/web",
     "build": "npm run build --workspace @luxar/web",
     "deploy:api": "npm run deploy --workspace @luxar/api",
     "deploy:web": "npm run build --workspace @luxar/web && npx wrangler pages deploy apps/web/dist --project-name luxaarinstitute",
-    "db:migrate": "npx wrangler d1 migrations apply luxar-lms --remote",
+    "db:migrate": "npm run migrate:remote --workspace @luxar/api",
     "db:generate": "npm run generate --workspace @luxar/db",
     "db:migrate:local": "npm run migrate:local --workspace @luxar/api",
     "db:seed:local": "npm run seed:local --workspace @luxar/api"

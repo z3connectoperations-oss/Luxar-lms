@@ -13,6 +13,8 @@ import meRouter from "./routes/me";
 import learnRouter from "./routes/learn";
 import trainerRouter from "./routes/trainer";
 import liveRouter from "./routes/live";
+import { publicTestSeries, studentTestSeries } from "./routes/testSeries";
+import adminTestSeries from "./routes/adminTestSeries";
 import { handleScheduled } from "./scheduled";
 import type { AppEnv } from "./types";
 
@@ -159,16 +161,22 @@ app.get("/auth/me", requireAuth, (c) => c.json({ user: toMe(c.get("user")!) }));
 
 // Public website API (no auth).
 app.route("/site", siteRouter);
+app.route("/site/test-series", publicTestSeries);
+
 // Authenticated student/checkout APIs.
 app.route("/checkout", checkoutRouter);
 app.route("/me", meRouter);
 app.route("/learn", learnRouter);
+app.route("/learn/test-series", studentTestSeries);
+
 // Live classes (LiveKit Cloud token + sessions).
 app.route("/live", liveRouter);
 // Trainer portal API (trainer + admin).
 app.route("/trainer", trainerRouter);
 // Admin master-root API (all routes require role=admin).
 app.route("/admin", adminRouter);
+app.route("/admin/test-series", adminTestSeries);
+
 
 // Worker entry: HTTP via Hono + Cron via scheduled().
 export default {

@@ -7,6 +7,7 @@ import { cn } from "../lib/cn";
 
 interface CmsBlock { type: string; dataJson: string }
 interface Course { id: string; title: string; slug: string; summary: string | null; category: string | null; fromPrice: number | null; thumbnailR2Key?: string | null }
+interface TestSeries { id: string; title: string; slug: string; descriptionMd: string | null; price: number; discountPrice: number | null; thumbnailR2Key?: string | null }
 interface Topper { id: string; name: string; exam: string | null; year: number | null; quoteMd: string | null; imageUrl?: string }
 
 const FALLBACK_TOPPERS: Topper[] = [
@@ -18,8 +19,9 @@ const FALLBACK_TOPPERS: Topper[] = [
 ];
 
 export default function Landing() {
-  const [hero, setHero] = useState<any>({ title: "Where Ambition Meets Expert Preparation", subtitle: "Prepare confidently for TNPSC AE Civil, UPSC, Banking, GATE (Civil), and NEET through expert-led courses, mock tests, mentorship, current affairs, and structured learning pathways designed for long-term success." });
+  const [hero, setHero] = useState<any>({ title: "Crack India's toughest exams with confidence", subtitle: "Structured video courses, thousands of practice questions, live classes and 1:1 mentorship — for RBI, SEBI, TNPSC, UPSC and more." });
   const [courses, setCourses] = useState<Course[]>([]);
+  const [testSeries, setTestSeries] = useState<TestSeries[]>([]);
   const [toppers, setToppers] = useState<Topper[]>([]);
 
   useEffect(() => {
@@ -28,6 +30,7 @@ export default function Landing() {
       if (h) { try { setHero(JSON.parse(h.dataJson)); } catch { /* keep default */ } }
     }).catch(() => {});
     api<{ courses: Course[] }>("/site/courses").then((d) => setCourses(d.courses || [])).catch(() => {});
+    api<{ testSeries: TestSeries[] }>("/site/test-series").then((d) => setTestSeries(d.testSeries || [])).catch(() => {});
     api<{ toppers: Topper[] }>("/site/toppers").then((d) => setToppers(d.toppers || [])).catch(() => {});
   }, []);
 
@@ -36,6 +39,7 @@ export default function Landing() {
       <Hero hero={hero} />
       <StatsBand />
       <CuratedDisciplines courses={courses} />
+      <FeaturedTestSeries testSeries={testSeries} />
       <StudyLibrary />
       <WallOfHonor toppers={toppers.length ? toppers : FALLBACK_TOPPERS} />
       <NeedGuidance />
@@ -334,6 +338,63 @@ function CuratedDisciplines({ courses }: { courses: Course[] }) {
           {courses.slice(0, 8).map((c) => (
             <CourseCard key={c.id} title={c.title} slug={c.slug} exam={c.category} summary={c.summary} fromPrice={c.fromPrice} image={c.thumbnailR2Key} />
           ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------- Featured Test Series ---------- */
+function FeaturedTestSeries({ testSeries }: { testSeries: TestSeries[] }) {
+  if (testSeries.length === 0) return null;
+  return (
+    <section className="bg-canvas py-24 border-t border-border">
+      <div className="mx-auto max-w-content px-6 lg:px-10">
+        <div className="mb-16 flex items-end justify-between">
+          <div className="max-w-xl">
+            <h2 className="mb-4 font-display text-3xl font-bold tracking-tight text-ink">Standalone Test Series</h2>
+            <p className="text-muted">Rigorous, exam-grade test series to help you evaluate your preparation and master time management.</p>
+          </div>
+          <Link
+            to="/test-series"
+            className="shrink-0 border-b-2 border-gold-500 pb-1 text-sm font-semibold uppercase tracking-wider text-ink transition-all hover:border-gold-300 hover:text-muted"
+          >
+            Browse Tests
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {testSeries.slice(0, 4).map((ts) => {
+            const finalPrice = ts.discountPrice ?? ts.price;
+            return (
+              <Link key={ts.id} to={`/test-series/${ts.slug}`} className="group flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-white transition-all hover:-translate-y-1 hover:border-gold-400 hover:shadow-lux">
+                <div className="relative aspect-[16/9] w-full overflow-hidden bg-neutral-100">
+                  {ts.thumbnailR2Key ? (
+                    <img src={`/files/${ts.thumbnailR2Key}`} alt={ts.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-ink">
+                      <span className="font-display text-2xl font-bold text-white/20">TEST SERIES</span>
+                    </div>
+                  )}
+                  <div className="absolute left-3 top-3 rounded-md bg-white/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-ink backdrop-blur-md">
+                    Test Series
+                  </div>
+                </div>
+                <div className="flex flex-1 flex-col p-5">
+                  <h3 className="font-display text-lg font-bold leading-tight text-ink line-clamp-2 mb-2">{ts.title}</h3>
+                  <p className="text-sm text-muted line-clamp-2 mb-4">{ts.descriptionMd?.replace(/[#*`_]/g, "").slice(0, 80) || "Comprehensive test series"}</p>
+                  
+                  <div className="mt-auto flex items-center justify-between pt-4 border-t border-border">
+                    <div className="font-display text-lg font-bold text-ink">
+                      {finalPrice === 0 ? "Free" : `₹${(finalPrice / 100).toLocaleString()}`}
+                    </div>
+                    <div className="flex items-center gap-1 text-xs font-semibold text-gold-600 transition-colors group-hover:text-gold-500">
+                      Enroll <Award size={14} />
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </div>
     </section>

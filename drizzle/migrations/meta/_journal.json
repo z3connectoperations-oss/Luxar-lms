@@ -64,6 +64,13 @@
       "when": 1782996096788,
       "tag": "0008_lazy_starfox",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1783317725447,
+      "tag": "0009_tricky_maximus",
+      "breakpoints": true
     }
   ]
 }

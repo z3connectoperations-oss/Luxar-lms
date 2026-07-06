@@ -42,7 +42,7 @@ export default function MockTestIntro() {
         <p>3. You can review and change your answers before final submission.</p>
         <p>4. Once the timer ends, the test will be automatically submitted.</p>
       </div>
-      <Button onClick={startTest} disabled={starting} size="lg" className="w-full">
+      <Button onClick={startTest} disabled={starting} className="w-full py-3">
         {starting ? "Starting..." : "Start Test"}
       </Button>
     </Card>

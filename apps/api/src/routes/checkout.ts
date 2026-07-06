@@ -10,7 +10,9 @@ import {
   enrollments,
   products,
   shippingAddresses,
-  invoices
+  invoices,
+  testSeries,
+  testSeriesEnrollments
 } from "@luxar/db";
 import { requireAuth } from "../middleware";
 import { createNotification } from "../notify";
@@ -200,6 +202,23 @@ async function fulfill(db: Db, env: Env, userId: string, orderId: string) {
       const course = await db.select().from(courses).where(eq(courses.id, item.productId)).get();
       if (!course) continue;
       courseId = course.id; validityDays = course.durationDays ?? 365;
+    } else if (item.kind === "test-series" && item.productId) {
+      // Test Series fulfillment
+      const ts = await db.select().from(testSeries).where(eq(testSeries.id, item.productId)).get();
+      if (!ts) continue;
+      const alreadyTs = await db.select().from(testSeriesEnrollments)
+        .where(and(eq(testSeriesEnrollments.userId, userId), eq(testSeriesEnrollments.testSeriesId, ts.id))).get();
+      if (!alreadyTs) {
+        await db.insert(testSeriesEnrollments).values({
+          id: crypto.randomUUID(), userId, testSeriesId: ts.id,
+          expiryDate: new Date(Date.now() + ts.validityDays * 86400000)
+        });
+        await createNotification(db, env, {
+          userId, type: "enrollment", title: "Test Series Enrollment confirmed",
+          body: "You now have access to your test series. Good luck!", link: "/student/test-series",
+        });
+      }
+      continue;
     } else continue;
 
     const already = await db.select().from(enrollments)
@@ -300,6 +319,85 @@ checkout.post("/course-order", async (c) => {
   return c.json({ error: "Failed to initialize payment" }, 500);
 });
 
+// Enroll directly in a Test Series (standalone).
+checkout.post("/test-series-order", async (c) => {
+  const db = c.get("db");
+  const user = c.get("user")!;
+  const b = await c.req.json().catch(() => null);
+  if (!b?.testSeriesId) return c.json({ error: "testSeriesId required" }, 400);
+
+  const ts = await db.select().from(testSeries).where(eq(testSeries.id, b.testSeriesId)).get();
+  if (!ts) return c.json({ error: "test series not found" }, 404);
+
+  const subtotal = ts.discountPrice != null ? ts.discountPrice : (ts.price ?? 0);
+  let discount = 0;
+  // If global coupons were to be added for test series, handle here. We omit for now.
+  const total = Math.max(0, subtotal - discount);
+
+  // Free test series -> instant enroll
+  if (total === 0) {
+    const orderId = crypto.randomUUID();
+    await db.insert(orders).values({ id: orderId, userId: user.id, status: "paid", subtotal, discount, total });
+    await db.insert(orderItems).values({ id: crypto.randomUUID(), orderId, kind: "test-series", productId: ts.id, qty: 1, price: total });
+    const paymentId = crypto.randomUUID();
+    await db.insert(payments).values({ id: paymentId, orderId, status: "paid", amount: total });
+    await fulfill(db, c.env, user.id, orderId);
+    return c.json({ orderId, amount: 0, free: true, enrolled: true });
+  }
+
+  const merchantTransactionId = `MT_${crypto.randomUUID().replace(/-/g, "").substring(0, 20)}`;
+  const orderId = crypto.randomUUID();
+
+  const existingPending = await db.select().from(orders).innerJoin(orderItems, eq(orders.id, orderItems.orderId))
+    .where(and(
+      eq(orders.userId, user.id),
+      eq(orders.status, "created"),
+      eq(orderItems.productId, ts.id),
+      eq(orderItems.kind, "test-series")
+    )).get();
+
+  let activeOrderId = orderId;
+  let activeMerchantTransactionId = merchantTransactionId;
+
+  if (existingPending && existingPending.orders.paymentProvider === "phonepe") {
+    activeOrderId = existingPending.orders.id;
+    activeMerchantTransactionId = existingPending.orders.merchantTransactionId || merchantTransactionId;
+    if (!existingPending.orders.merchantTransactionId) {
+      await db.update(orders).set({ merchantTransactionId: activeMerchantTransactionId }).where(eq(orders.id, activeOrderId));
+    }
+  } else {
+    await db.insert(orders).values({ 
+      id: orderId, userId: user.id, status: "created", 
+      subtotal, discount, total,
+      paymentProvider: "phonepe", merchantTransactionId, paymentStatus: "INITIATED"
+    });
+    await db.insert(orderItems).values({ id: crypto.randomUUID(), orderId, kind: "test-series", productId: ts.id, qty: 1, price: total });
+    const paymentId = crypto.randomUUID();
+    await db.insert(payments).values({ id: paymentId, orderId, status: "created", amount: total });
+  }
+
+  const provider = PaymentFactory.getProvider("phonepe");
+  const paymentRes = await provider.createPayment({
+    merchantTransactionId: activeMerchantTransactionId,
+    orderId: activeOrderId,
+    userId: user.id,
+    amount: total,
+    mobileNumber: "9999999999"
+  }, c.env);
+
+  if (paymentRes?.redirectUrl) {
+    return c.json({ orderId: activeOrderId, amount: total, phonepeUrl: paymentRes.redirectUrl });
+  }
+
+  // MOCK MODE FALLBACK
+  if (!c.env.PHONEPE_MERCHANT_ID) {
+    return c.json({ orderId: activeOrderId, amount: total, phonepeUrl: `/payment/result?transactionId=MOCK_${activeMerchantTransactionId}` });
+  }
+
+  return c.json({ error: "Failed to initialize payment" }, 500);
+});
+
+
 
 // Confirm payment and enroll
 checkout.post("/confirm-mock", async (c) => {
@@ -383,17 +481,23 @@ checkout.post("/phonepe-webhook", async (c) => {
 
 checkout.get("/status/:merchantTransactionId", async (c) => {
   const db = c.get("db");
-  const mId = c.req.param("merchantTransactionId");
+  const paramId = c.req.param("merchantTransactionId");
   
-  const order = await db.select().from(orders).where(eq(orders.merchantTransactionId, mId)).get();
+  const isMock = paramId.startsWith("MOCK_") && !c.env.PHONEPE_MERCHANT_ID;
+  const dbQueryId = isMock ? paramId.replace("MOCK_", "") : paramId;
+  
+  const order = await db.select().from(orders).where(eq(orders.merchantTransactionId, dbQueryId)).get();
   if (!order) return c.json({ error: "Order not found" }, 404);
 
+  const firstItem = await db.select().from(orderItems).where(eq(orderItems.orderId, order.id)).get();
+  const kind = firstItem?.kind || "course";
+
   if (order.paymentVerified) {
-    return c.json({ status: "SUCCESS" });
+    return c.json({ status: "SUCCESS", kind });
   }
 
   // MOCK MODE FALLBACK
-  if (mId.startsWith("MOCK_") && !c.env.PHONEPE_MERCHANT_ID) {
+  if (isMock) {
     await db.update(orders).set({
       paymentStatus: "SUCCESS",
       status: "paid",
@@ -404,11 +508,11 @@ checkout.get("/status/:merchantTransactionId", async (c) => {
     if (!order.paymentVerified) {
       await fulfill(db, c.env, order.userId, order.id);
     }
-    return c.json({ status: "SUCCESS" });
+    return c.json({ status: "SUCCESS", kind });
   }
 
   const provider = PaymentFactory.getProvider("phonepe");
-  const statusRes = await provider.getPaymentStatus(mId, c.env);
+  const statusRes = await provider.getPaymentStatus(paramId, c.env);
 
   if (statusRes) {
     const isSuccess = statusRes.status === "SUCCESS";
@@ -426,10 +530,10 @@ checkout.get("/status/:merchantTransactionId", async (c) => {
       await fulfill(db, c.env, order.userId, order.id);
     }
     
-    return c.json({ status: statusRes.status });
+    return c.json({ status: statusRes.status, kind });
   }
 
-  return c.json({ status: order.paymentStatus });
+  return c.json({ status: order.paymentStatus, kind });
 });
 
 export default checkout;
