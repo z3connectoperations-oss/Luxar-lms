@@ -456,6 +456,13 @@ export default function PublicLayout() {
               Courses
             </NavLink>
             <NavLink
+              to="/test-series"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={({ isActive }) => cn("block text-lg font-semibold", isActive ? "text-gold-600" : "text-ink")}
+            >
+              Test Series
+            </NavLink>
+            <NavLink
               to="/about"
               onClick={() => setIsMobileMenuOpen(false)}
               className={({ isActive }) => cn("block text-lg font-semibold", isActive ? "text-gold-600" : "text-ink")}
@@ -703,6 +710,18 @@ export default function PublicLayout() {
                 </div>
                 <ChevronRight size={16} className="text-muted transition-transform group-hover:translate-x-0.5 group-hover:text-gold-600" />
               </Link>
+
+              <Link
+                to="/student/test-series"
+                onClick={() => setIsProfileOpen(false)}
+                className="group flex items-center justify-between rounded-xl border border-border bg-canvas/40 p-3.5 text-ink transition-all duration-200 hover:border-gold-400 hover:bg-gold-50"
+              >
+                <div className="flex items-center gap-3">
+                  <Award size={18} className="text-gold-600" />
+                  <span className="text-sm font-semibold">My Test Series</span>
+                </div>
+                <ChevronRight size={16} className="text-muted transition-transform group-hover:translate-x-0.5 group-hover:text-gold-600" />
+              </Link>
             </nav>
           )}
         </div>
@@ -740,7 +759,7 @@ function Footer() {
   };
 
   const linkCols = [
-    { h: "Quick Links", items: [["Courses", "/courses"], ["About Us", "/about"]] },
+    { h: "Quick Links", items: [["Courses", "/courses"], ["Test Series", "/test-series"], ["About Us", "/about"]] },
     { h: "Exams", items: [["TNPSC AE Civil", "/courses?exam=TNPSC%20AE%20Civil"], ["UPSC", "/courses?exam=UPSC"], ["Banking", "/courses?exam=Banking"], ["GATE (Civil)", "/courses?exam=GATE%20(Civil)"], ["NEET", "/courses?exam=NEET"]] },
   ];
   return (
