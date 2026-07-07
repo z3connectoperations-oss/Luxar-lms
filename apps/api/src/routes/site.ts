@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, inArray, asc } from "drizzle-orm";
 import {
   courses,
   categories,
@@ -43,7 +43,10 @@ const effectivePrice = (co: { price: number | null; discountPrice: number | null
 // Published course catalog with category name + price.
 site.get("/courses", async (c) => {
   const db = c.get("db");
-  const list = await db.select().from(courses).where(eq(courses.status, "published")).all();
+  const list = await db.select().from(courses)
+    .where(inArray(courses.status, ["active", "coming_soon"]))
+    .orderBy(asc(courses.position))
+    .all();
   const cats = await db.select().from(categories).all();
   const catOf = (id: string | null) => cats.find((x) => x.id === id) || null;
   return c.json({
@@ -55,6 +58,7 @@ site.get("/courses", async (c) => {
         category: cat?.name ?? null, categorySlug: cat?.slug ?? null,
         price: co.price ?? 0, discountPrice: co.discountPrice ?? null,
         fromPrice: effectivePrice(co), // for legacy card compatibility
+        status: co.status, position: co.position
       };
     }),
   });
@@ -64,7 +68,7 @@ site.get("/courses", async (c) => {
 site.get("/courses/:slug", async (c) => {
   const db = c.get("db");
   const course = await db.select().from(courses).where(eq(courses.slug, c.req.param("slug"))).get();
-  if (!course || course.status === "draft") return c.json({ error: "not found" }, 404);
+  if (!course || course.status === "draft" || course.status === "hidden") return c.json({ error: "not found" }, 404);
 
   const cat = course.categoryId ? await db.select().from(categories).where(eq(categories.id, course.categoryId)).get() : null;
   const trainer = course.trainerId ? await db.select({ name: users.name }).from(users).where(eq(users.id, course.trainerId)).get() : null;

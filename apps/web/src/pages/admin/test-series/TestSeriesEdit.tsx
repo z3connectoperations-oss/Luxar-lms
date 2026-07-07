@@ -4,16 +4,21 @@ import { ArrowLeft, Save, Target } from "lucide-react";
 import { api } from "../../../lib/api";
 import { Input, Button, Textarea } from "../../../components/ui";
 
+type TSStatus = "draft" | "published" | "coming_soon";
+
 interface TestSeries {
   id: string;
   title: string;
   slug: string;
   descriptionMd: string | null;
-  status: "draft" | "published";
+  category: string | null;
+  difficulty: string | null;
+  status: TSStatus;
   price: number;
   discountPrice: number | null;
   validityDays: number;
   thumbnailR2Key: string | null;
+  bannerR2Key: string | null;
   position: number;
 }
 
@@ -28,6 +33,8 @@ export default function AdminTestSeriesEdit() {
     title: "",
     slug: "",
     descriptionMd: "",
+    category: "",
+    difficulty: "medium",
     status: "draft",
     price: 0,
     discountPrice: null,
@@ -140,6 +147,49 @@ export default function AdminTestSeriesEdit() {
 
         <div className="grid gap-6 sm:grid-cols-2">
           <div>
+            <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Category</label>
+            <Input
+              value={data.category || ""}
+              onChange={(e) => setData({ ...data, category: e.target.value })}
+              placeholder="e.g. TNPSC, UPSC, Banking, SSC, Engineering"
+            />
+            <p className="mt-1 text-[11px] text-muted">Shown as a badge on the catalogue card.</p>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Difficulty</label>
+            <select
+              value={data.difficulty || "medium"}
+              onChange={(e) => setData({ ...data, difficulty: e.target.value })}
+              className="h-10 w-full rounded-xl border border-border bg-white px-3 text-sm text-ink outline-none transition focus:border-gold-400 focus:ring-1 focus:ring-gold-400"
+            >
+              <option value="easy">Easy</option>
+              <option value="medium">Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="grid gap-6 sm:grid-cols-2">
+          <div>
+            <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Banner Image URL / Key</label>
+            <Input
+              value={data.bannerR2Key || ""}
+              onChange={(e) => setData({ ...data, bannerR2Key: e.target.value })}
+              placeholder="https://… or R2 object key"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Thumbnail URL / Key</label>
+            <Input
+              value={data.thumbnailR2Key || ""}
+              onChange={(e) => setData({ ...data, thumbnailR2Key: e.target.value })}
+              placeholder="https://… or R2 object key"
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-6 sm:grid-cols-2">
+          <div>
             <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Price (₹)</label>
             <Input
               type="number"
@@ -183,11 +233,12 @@ export default function AdminTestSeriesEdit() {
             <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Status</label>
             <select
               value={data.status || "draft"}
-              onChange={(e) => setData({ ...data, status: e.target.value as "draft" | "published" })}
+              onChange={(e) => setData({ ...data, status: e.target.value as TSStatus })}
               className="h-10 w-full rounded-xl border border-border bg-white px-3 text-sm text-ink outline-none transition focus:border-gold-400 focus:ring-1 focus:ring-gold-400"
             >
               <option value="draft">Draft (Hidden)</option>
-              <option value="published">Published</option>
+              <option value="published">Published (Active)</option>
+              <option value="coming_soon">Coming Soon</option>
             </select>
           </div>
         </div>

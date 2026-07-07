@@ -1,0 +1,1 @@
+ALTER TABLE `courses` ADD `position` integer DEFAULT 0;

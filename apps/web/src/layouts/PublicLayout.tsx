@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useAuth, homeForRole } from "../auth/AuthContext";
 import { api } from "../lib/api";
+import { mediaUrl } from "../lib/media";
 import { Button, Input } from "../components/ui";
 import { cn } from "../lib/cn";
 
@@ -111,10 +112,11 @@ export default function PublicLayout() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Dynamic courses and categories fetching
+  // Dynamic courses fetching
   const [courses, setCourses] = useState<any[]>([]);
-  const [dbCategories, setDbCategories] = useState<any[]>([]);
-  const [cmsExploreConfig, setCmsExploreConfig] = useState<any[]>(DEFAULT_EXPLORE_CATEGORIES);
+
+  const activeCourses = useMemo(() => courses.filter((c) => c.status === "active"), [courses]);
+  const comingSoonCourses = useMemo(() => courses.filter((c) => c.status === "coming_soon"), [courses]);
 
   // Login form states
   const [loginEmail, setLoginEmail] = useState("");
@@ -125,26 +127,6 @@ export default function PublicLayout() {
   useEffect(() => {
     api<{ courses: any[] }>("/site/courses")
       .then((d) => setCourses(d.courses || []))
-      .catch(() => {});
-
-    api<{ categories: any[] }>("/site/categories")
-      .then((d) => setDbCategories(d.categories || []))
-      .catch(() => {});
-
-    api<{ blocks: any[] }>("/site/cms")
-      .then((d) => {
-        const block = d.blocks?.find((b) => b.key === "explore_categories");
-        if (block) {
-          try {
-            const parsed = JSON.parse(block.dataJson);
-            if (Array.isArray(parsed)) {
-              setCmsExploreConfig(parsed);
-            }
-          } catch (e) {
-            console.error("Failed to parse explore_categories cms block", e);
-          }
-        }
-      })
       .catch(() => {});
   }, []);
 
@@ -158,42 +140,6 @@ export default function PublicLayout() {
     }
   }, [searchParams, setSearchParams]);
 
-  // Match category items against active database categories
-  const activeDbCategoryMap = useMemo(() => {
-    const map = new Map<string, any>();
-    dbCategories.forEach((cat) => {
-      if (cat.name) {
-        map.set(cat.name.toLowerCase().trim(), cat);
-      }
-    });
-    return map;
-  }, [dbCategories]);
-
-  const activeExploreColumns = useMemo(() => {
-    return cmsExploreConfig
-      .map((col) => {
-        const activeCats = (col.categories || [])
-          .map((cName: string) => {
-            const dbCatObj = activeDbCategoryMap.get(cName.toLowerCase().trim());
-            return dbCatObj ? { label: dbCatObj.name, to: `/courses?category=${encodeURIComponent(dbCatObj.name)}` } : null;
-          })
-          .filter(Boolean) as { label: string; to: string }[];
-
-        return {
-          title: col.title,
-          items: activeCats,
-        };
-      })
-      .filter((col) => col.items.length > 0);
-  }, [cmsExploreConfig, activeDbCategoryMap]);
-
-  const gridColsClass = useMemo(() => {
-    const count = activeExploreColumns.length;
-    if (count <= 1) return "grid-cols-1 max-w-md mx-auto";
-    if (count === 2) return "grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto";
-    if (count === 3) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 max-w-5xl mx-auto";
-    return "grid-cols-1 sm:grid-cols-2 md:grid-cols-4";
-  }, [activeExploreColumns]);
 
   const search = (e: React.FormEvent) => {
     e.preventDefault();
@@ -257,7 +203,7 @@ export default function PublicLayout() {
             }
           >
             {/* Logo + nav */}
-            <div className="flex items-center gap-10">
+            <div className="flex shrink-0 items-center gap-6">
               <Link to="/" className="flex shrink-0 items-center gap-3">
                 <img
                   src="/luxaar.png"
@@ -269,18 +215,102 @@ export default function PublicLayout() {
                 </span>
               </Link>
 
-              <nav className="hidden items-center gap-8 lg:flex">
-                <button
-                  onClick={() => {
-                    setIsExploreOpen(!isExploreOpen);
-                    setIsLoginOpen(false);
-                    setIsProfileOpen(false);
-                  }}
-                  className="flex items-center gap-1 whitespace-nowrap pb-1 text-sm font-semibold tracking-wide text-muted transition-colors duration-200 hover:text-ink cursor-pointer"
-                >
-                  Explore Programs
-                  <ChevronDown size={14} className={cn("transition-transform duration-200", isExploreOpen && "rotate-180")} />
-                </button>
+              <nav className="hidden items-center gap-5 lg:flex xl:gap-6">
+                <div className="relative">
+                  <button
+                    onClick={() => {
+                      setIsExploreOpen(!isExploreOpen);
+                      setIsLoginOpen(false);
+                      setIsProfileOpen(false);
+                    }}
+                    className="flex items-center gap-1 whitespace-nowrap pb-1 text-sm font-semibold tracking-wide text-muted transition-colors duration-200 hover:text-ink cursor-pointer"
+                  >
+                    Explore Programs
+                    <ChevronDown size={14} className={cn("transition-transform duration-200", isExploreOpen && "rotate-180")} />
+                  </button>
+
+                  {/* Explore Programs Mega Dropdown */}
+                  <div
+                    className={cn(
+                      "absolute left-[calc(50%-210px)] top-full mt-4 z-30 w-full min-w-[420px] max-w-[480px] origin-top overflow-hidden rounded-2xl border border-border bg-white shadow-lux transition-all duration-300",
+                      isExploreOpen ? "scale-y-100 opacity-100" : "pointer-events-none scale-y-95 opacity-0"
+                    )}
+                  >
+                    <div className="flex flex-col">
+                      {/* Active Programs Section */}
+                      <div className="p-4">
+                        <h4 className="mb-3 flex items-center gap-2 text-xs font-extrabold uppercase tracking-widest text-ink">
+                          <span>📚</span> Active Programs
+                        </h4>
+                        <div className="flex flex-col space-y-1 max-h-[300px] overflow-y-auto pr-1">
+                          {activeCourses.length === 0 ? (
+                            <div className="py-2 text-sm text-muted">No active programs yet.</div>
+                          ) : (
+                            activeCourses.map((c) => (
+                              <Link
+                                key={c.id}
+                                to={`/courses/${c.slug}`}
+                                onClick={() => setIsExploreOpen(false)}
+                                className="group flex items-center justify-between rounded-xl p-2 transition-all hover:bg-gold-50"
+                              >
+                                <div className="flex items-center gap-3">
+                                  {c.thumbnailR2Key ? (
+                                    <img src={mediaUrl(c.thumbnailR2Key) || undefined} className="h-10 w-10 rounded-lg object-cover" alt="" />
+                                  ) : (
+                                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-neutral-100 text-neutral-400">
+                                      <BookOpen size={16} />
+                                    </div>
+                                  )}
+                                  <div className="flex flex-col">
+                                    <span className="text-sm font-semibold text-ink group-hover:text-gold-700 line-clamp-1">{c.title}</span>
+                                    {c.category && <span className="text-[11px] font-medium text-muted line-clamp-1">{c.category}</span>}
+                                  </div>
+                                </div>
+                                <ChevronRight size={16} className="text-muted transition-transform group-hover:translate-x-1 group-hover:text-gold-600" />
+                              </Link>
+                            ))
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="h-px w-full bg-border" />
+
+                      {/* Coming Soon Section */}
+                      {comingSoonCourses.length > 0 && (
+                        <>
+                          <div className="p-4 bg-neutral-50/50">
+                            <h4 className="mb-3 flex items-center gap-2 text-xs font-extrabold uppercase tracking-widest text-ink">
+                              <span>🚀</span> Coming Soon
+                            </h4>
+                            <div className="flex flex-col space-y-2">
+                              {comingSoonCourses.map((c) => (
+                                <div
+                                  key={c.id}
+                                  className="flex items-center justify-between rounded-xl p-2"
+                                >
+                                  <span className="text-sm font-medium text-ink/70 line-clamp-1">{c.title}</span>
+                                  <span className="shrink-0 rounded-full bg-gold-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-gold-800">
+                                    Coming Soon
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="h-px w-full bg-border" />
+                        </>
+                      )}
+
+                      {/* View All */}
+                      <Link
+                        to="/courses"
+                        onClick={() => setIsExploreOpen(false)}
+                        className="flex items-center justify-center p-3 text-sm font-semibold text-ink transition-colors hover:bg-neutral-50 hover:text-gold-600"
+                      >
+                        View All Courses &rarr;
+                      </Link>
+                    </div>
+                  </div>
+                </div>
                 {navItems.map((n) => (
                   <NavLink
                     key={n.to}
@@ -312,17 +342,17 @@ export default function PublicLayout() {
             </div>
 
             {/* Search + Auth */}
-            <div className="flex items-center gap-4">
+            <div className="flex min-w-0 shrink items-center gap-3">
               <form
                 onSubmit={search}
-                className="relative hidden items-center xl:flex"
+                className="relative hidden min-w-0 items-center xl:flex"
               >
                 <Search size={16} className="absolute left-3 text-muted" />
                 <input
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   placeholder="Search courses..."
-                  className="w-48 rounded-full border border-border bg-white py-2 pl-10 pr-4 text-sm text-ink outline-none transition-all placeholder:text-faint focus:border-gold-400 focus:ring-2 focus:ring-gold-200"
+                  className="w-40 min-w-0 rounded-full border border-border bg-white py-2 pl-10 pr-4 text-sm text-ink outline-none transition-all placeholder:text-faint focus:border-gold-400 focus:ring-2 focus:ring-gold-200"
                 />
               </form>
 
@@ -380,43 +410,7 @@ export default function PublicLayout() {
             </div>
           </div>
 
-          {/* Explore Programs Mega Dropdown Panel */}
-          <div
-            className={cn(
-              "absolute left-0 right-0 top-full z-30 origin-top overflow-hidden border-b border-border bg-white shadow-lux transition-all duration-200",
-              isExploreOpen ? "max-h-[600px] scale-y-100 py-8 opacity-100" : "pointer-events-none max-h-0 scale-y-0 opacity-0"
-            )}
-          >
-            {activeExploreColumns.length === 0 ? (
-              <div className="py-4 text-center text-xs font-medium text-muted">
-                No active programs available.
-              </div>
-            ) : (
-              <div className={cn("mx-auto grid max-w-content gap-8 px-6 text-ink", gridColsClass)}>
-                {activeExploreColumns.map((cat, idx) => (
-                  <div key={idx} className="flex flex-col">
-                    <h4 className="mb-3 flex items-center gap-1.5 border-b border-border pb-2 text-xs font-extrabold uppercase tracking-widest text-ink">
-                      <Sparkles size={12} className="text-gold-500" />
-                      {cat.title}
-                    </h4>
-                    <ul className="space-y-2">
-                      {cat.items.map((item, itemIdx) => (
-                        <li key={itemIdx}>
-                          <Link
-                            to={item.to}
-                            onClick={() => setIsExploreOpen(false)}
-                            className="block py-0.5 text-[13px] font-medium text-muted transition-colors hover:text-gold-600 hover:underline"
-                          >
-                            {item.label}
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+
         </div>
       </header>
 

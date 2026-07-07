@@ -10,7 +10,7 @@ const BASE = import.meta.env.VITE_API_URL || "http://localhost:8787";
 
 interface Course {
   id: string; title: string; slug: string; status: string; categoryName: string | null;
-  thumbnailR2Key: string | null; level: string | null; price: number | null;
+  thumbnailR2Key: string | null; level: string | null; price: number | null; position: number;
 }
 interface Category { id: string; name: string }
 interface Trainer { id: string; name: string }
@@ -35,7 +35,7 @@ const emptyForm = {
   thumbnailR2Key: "", bannerR2Key: "", introPdfR2Key: "",
   downloadableEnabled: true, liveClassesEnabled: true,
   completionRule: "allLessons", minProgressPct: 100,
-  status: "draft",
+  status: "draft", position: 0,
 };
 type Form = typeof emptyForm;
 
@@ -98,6 +98,7 @@ export default function Courses() {
           completionRule: f.completionRule,
           minProgressPct: Number(f.minProgressPct),
           status: f.status,
+          position: Number(f.position),
         }),
       });
       setF(emptyForm);
@@ -107,10 +108,7 @@ export default function Courses() {
     } finally { setBusy(false); }
   };
 
-  const togglePublish = async (c: Course) => {
-    await api(`/admin/courses/${c.id}`, { method: "PATCH", body: JSON.stringify({ status: c.status === "published" ? "draft" : "published" }) });
-    load();
-  };
+
 
   const remove = async (c: Course) => {
     if (!window.confirm(`Delete "${c.title}"?\n\nThis permanently removes the course and ALL of its modules, lessons, materials, tests, live sessions/recordings, and enrollments. This cannot be undone.`)) return;
@@ -145,7 +143,7 @@ export default function Courses() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {courses.map((c) => {
             const img = mediaUrl(c.thumbnailR2Key);
-            const published = c.status === "published";
+            const isActive = c.status === "active";
             return (
               <div key={c.id} className="flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-card transition hover:-translate-y-0.5 hover:shadow-soft">
                 {/* Cover */}
@@ -157,7 +155,7 @@ export default function Courses() {
                       <BookOpen size={26} className="text-white/90" />
                     </div>
                   )}
-                  <span className={`absolute left-2.5 top-2.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${published ? "bg-ink text-white" : "bg-amber-50 text-amber-800 ring-1 ring-amber-100"}`}>
+                  <span className={`absolute left-2.5 top-2.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${isActive ? "bg-ink text-white" : c.status === "coming_soon" ? "bg-amber-50 text-amber-800 ring-1 ring-amber-100" : "bg-neutral-100 text-neutral-600 ring-1 ring-neutral-200"}`}>
                     {c.status}
                   </span>
                 </div>
@@ -174,9 +172,7 @@ export default function Courses() {
                   </div>
 
                   <div className="mt-3 flex items-center gap-2 border-t border-divider pt-3">
-                    <Button variant="outline" size="sm" className="flex-1" onClick={() => togglePublish(c)}>
-                      {published ? "Unpublish" : "Publish"}
-                    </Button>
+
                     <Link to={`/admin/courses/${c.id}`} className="flex-1">
                       <Button size="sm" className="w-full"><Pencil size={14} /> Manage</Button>
                     </Link>
@@ -323,13 +319,20 @@ export default function Courses() {
                   <input type="checkbox" checked={f.liveClassesEnabled} onChange={(e) => set({ liveClassesEnabled: e.target.checked })} /> Live classes enabled
                 </label>
 
+                {/* Display Order */}
+                <div>
+                  <Label>Display Order</Label>
+                  <Input type="number" min={0} value={f.position} onChange={(e) => set({ position: +e.target.value })} />
+                </div>
+
                 {/* Status */}
                 <div>
                   <Label>Status</Label>
                   <Select value={f.status} onChange={(e) => set({ status: e.target.value })}>
-                    <option value="draft">draft</option>
-                    <option value="published">published</option>
-                    <option value="private">private</option>
+                    <option value="draft">Draft</option>
+                    <option value="active">Active</option>
+                    <option value="coming_soon">Coming Soon</option>
+                    <option value="hidden">Hidden</option>
                   </Select>
                 </div>
 

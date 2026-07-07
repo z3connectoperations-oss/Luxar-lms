@@ -184,11 +184,16 @@ export default function CourseEdit() {
               <div><Label>Price (₹) — 0 for free</Label><Input type="number" value={rupees(form.price)} onChange={(e) => set({ price: Math.round(Number(e.target.value || 0) * 100) })} /></div>
               <div><Label>Discount price (₹, optional)</Label><Input type="number" value={form.discountPrice != null ? rupees(form.discountPrice) : ""} onChange={(e) => set({ discountPrice: e.target.value === "" ? null : Math.round(Number(e.target.value) * 100) })} /></div>
               <div>
+                <Label>Display Order</Label>
+                <Input type="number" min={0} value={form.position ?? 0} onChange={(e) => set({ position: +e.target.value })} />
+              </div>
+              <div>
                 <Label>Visibility</Label>
                 <Select value={form.status} onChange={(e) => set({ status: e.target.value })}>
                   <option value="draft">Draft (hidden)</option>
-                  <option value="published">Published (public)</option>
-                  <option value="private">Private (link only)</option>
+                  <option value="active">Active (public)</option>
+                  <option value="coming_soon">Coming Soon</option>
+                  <option value="hidden">Hidden</option>
                 </Select>
               </div>
             </div>

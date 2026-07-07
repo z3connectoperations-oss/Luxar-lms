@@ -89,7 +89,8 @@ export const courses = sqliteTable("courses", {
   enrollmentLimit: integer("enrollment_limit"),
   downloadableEnabled: bool("downloadable_enabled").default(true),
   liveClassesEnabled: bool("live_classes_enabled").default(true),
-  status: text("status").notNull().default("draft"), // draft | published | private
+  status: text("status").notNull().default("draft"), // draft | active | coming_soon | hidden
+  position: integer("position").default(0),
   ratingAvg: real("rating_avg").default(0),
   certificateEnabled: bool("certificate_enabled").default(false),
   completionRule: text("completion_rule").default("allLessons"), // allLessons | finalTestPass | pathway
@@ -668,10 +669,12 @@ export const testSeries = sqliteTable("test_series", {
   descriptionMd: text("description_md"),
   thumbnailR2Key: text("thumbnail_r2_key"),
   bannerR2Key: text("banner_r2_key"),
+  category: text("category"), // e.g. TNPSC, UPSC, Banking, SSC, Engineering
+  difficulty: text("difficulty"), // easy | medium | hard
   price: integer("price").notNull().default(0), // paise
   discountPrice: integer("discount_price"), // paise
   validityDays: integer("validity_days").notNull().default(365),
-  status: text("status").notNull().default("draft"), // draft | published
+  status: text("status").notNull().default("draft"), // draft | published | coming_soon
   position: integer("position").default(0),
   isFeatured: bool("is_featured").default(false),
   createdAt: createdAt(),

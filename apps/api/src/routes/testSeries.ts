@@ -17,10 +17,49 @@ export const studentTestSeries = new Hono<AppEnv>();
 studentTestSeries.use("*", requireAuth);
 
 // ---- Public Endpoints ----------------------------------------------------
+// Returns both active (published) and coming_soon series so the catalog can
+// render them in separate sections. Each series is enriched with aggregate
+// question count / duration / marks summed across its published child tests.
 publicTestSeries.get("/", async (c) => {
   const db = c.get("db");
-  const list = await db.select().from(testSeries).where(eq(testSeries.status, "published")).orderBy(testSeries.position).all();
-  return c.json({ testSeries: list });
+  const list = await db
+    .select()
+    .from(testSeries)
+    .where(inArray(testSeries.status, ["published", "coming_soon"]))
+    .orderBy(testSeries.position)
+    .all();
+
+  const seriesIds = list.map((s) => s.id);
+  const tests = seriesIds.length
+    ? await db
+        .select()
+        .from(testSeriesTests)
+        .where(and(inArray(testSeriesTests.testSeriesId, seriesIds), eq(testSeriesTests.status, "published")))
+        .all()
+    : [];
+  const testIds = tests.map((t) => t.id);
+  const qs = testIds.length
+    ? await db
+        .select({ testId: testSeriesQuestions.testId, marks: testSeriesQuestions.marks })
+        .from(testSeriesQuestions)
+        .where(inArray(testSeriesQuestions.testId, testIds))
+        .all()
+    : [];
+
+  const enriched = list.map((s) => {
+    const myTests = tests.filter((t) => t.testSeriesId === s.id);
+    const myTestIds = myTests.map((t) => t.id);
+    const myQs = qs.filter((q) => myTestIds.includes(q.testId));
+    return {
+      ...s,
+      testCount: myTests.length,
+      questionCount: myQs.length,
+      totalMarks: myQs.reduce((sum, q) => sum + (q.marks || 0), 0),
+      durationMin: myTests.reduce((sum, t) => sum + (t.durationMin || 0), 0),
+    };
+  });
+
+  return c.json({ testSeries: enriched });
 });
 
 publicTestSeries.get("/:slug", async (c) => {
@@ -45,11 +84,12 @@ publicTestSeries.get("/:slug", async (c) => {
       durationMinutes: t.durationMin,
       totalMarks: qs.reduce((sum, q) => sum + (q.marks || 0), 0),
       questionCount: qs.length,
+      passingPct: t.passingPct,
       maxAttempts: t.maxAttempts,
       position: t.position
     };
   });
-    
+
   return c.json({ testSeries: ts, tests: mappedTests });
 });
 

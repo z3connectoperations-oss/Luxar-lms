@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { BookOpen, Award, ChevronDown, X } from "lucide-react";
 import { api } from "../lib/api";
 import CourseCard from "../components/CourseCard";
@@ -76,16 +76,33 @@ function Hero({ hero }: { hero: any }) {
   const [formName, setFormName] = useState("");
   const [formPhone, setFormPhone] = useState("");
   const [formExam, setFormExam] = useState("");
+  const [leadBusy, setLeadBusy] = useState(false);
+  const [leadDone, setLeadDone] = useState(false);
   const [busy, setBusy] = useState(false);
-  const navigate = useNavigate();
 
   const handleCallback = async (e: React.FormEvent) => {
     e.preventDefault();
-    const params = new URLSearchParams();
-    if (formName) params.set("name", formName);
-    if (formPhone) params.set("phone", formPhone);
-    if (formExam) params.set("exam", formExam);
-    navigate(`/contact?${params.toString()}`);
+    if (!formName.trim() || !formPhone.trim()) return;
+    setLeadBusy(true);
+    try {
+      await api("/site/leads", {
+        method: "POST",
+        body: JSON.stringify({
+          name: formName.trim(),
+          phone: formPhone.trim(),
+          examInterest: formExam || null,
+        }),
+      });
+      setLeadDone(true);
+      setFormName("");
+      setFormPhone("");
+      setFormExam("");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to submit your request. Please try again.");
+    } finally {
+      setLeadBusy(false);
+    }
   };
 
   const [showMobileBanner, setShowMobileBanner] = useState(false);
@@ -135,9 +152,14 @@ function Hero({ hero }: { hero: any }) {
           </div>
         </div>
         
-        <button type="submit" className="mt-2 w-full rounded-xl bg-gold-500 py-4 text-sm font-bold uppercase tracking-wider text-ink shadow-lux transition-all duration-300 hover:bg-gold-400 hover:shadow-[0_0_20px_rgba(199,167,91,0.4)] active:scale-95">
-          Request Callback
+        <button type="submit" disabled={leadBusy} className="mt-2 w-full rounded-xl bg-gold-500 py-4 text-sm font-bold uppercase tracking-wider text-ink shadow-lux transition-all duration-300 hover:bg-gold-400 hover:shadow-[0_0_20px_rgba(199,167,91,0.4)] active:scale-95 disabled:opacity-60">
+          {leadBusy ? "Submitting..." : "Request Callback"}
         </button>
+        {leadDone && (
+          <p className="rounded-xl bg-green-500/15 px-4 py-3 text-center text-sm font-semibold text-green-300 ring-1 ring-green-400/30">
+            Request received! Our team will call you back shortly.
+          </p>
+        )}
       </form>
     </div>
   );
@@ -253,10 +275,16 @@ function Hero({ hero }: { hero: any }) {
                 
                 <button
                   type="submit"
-                  className="mt-2 w-full rounded-xl bg-gold-500 py-4 text-sm font-bold uppercase tracking-wider text-ink shadow-lux transition-all duration-300 hover:bg-gold-400 hover:shadow-[0_0_20px_rgba(199,167,91,0.4)] active:scale-95"
+                  disabled={leadBusy}
+                  className="mt-2 w-full rounded-xl bg-gold-500 py-4 text-sm font-bold uppercase tracking-wider text-ink shadow-lux transition-all duration-300 hover:bg-gold-400 hover:shadow-[0_0_20px_rgba(199,167,91,0.4)] active:scale-95 disabled:opacity-60"
                 >
-                  Request Callback
+                  {leadBusy ? "Submitting..." : "Request Callback"}
                 </button>
+                {leadDone && (
+                  <p className="rounded-xl bg-green-500/15 px-4 py-3 text-center text-sm font-semibold text-green-300 ring-1 ring-green-400/30">
+                    Request received! Our team will call you back shortly.
+                  </p>
+                )}
               </form>
             </div>
           </div>

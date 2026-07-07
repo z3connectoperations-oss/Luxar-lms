@@ -4,7 +4,7 @@ import { api } from "../../lib/api";
 import { enrollInTestSeries } from "../../lib/checkout";
 import { useAuth } from "../../auth/AuthContext";
 import { formatINR } from "../../lib/format";
-import { Target, ChevronRight, Clock, Award, FileText, ChevronDown, CheckCircle2 } from "lucide-react";
+import { Target, ChevronRight, Clock, Award, FileText, ChevronDown, CheckCircle2, Tag, BarChart3, Rocket, ListChecks } from "lucide-react";
 import { cn } from "../../lib/cn";
 
 interface Test {
@@ -13,6 +13,7 @@ interface Test {
   durationMinutes: number;
   totalMarks: number;
   questionCount: number;
+  passingPct: number;
   maxAttempts: number;
 }
 
@@ -22,6 +23,9 @@ interface TestSeriesDetailData {
     title: string;
     slug: string;
     descriptionMd: string | null;
+    category: string | null;
+    difficulty: string | null;
+    status: string;
     price: number;
     discountPrice: number | null;
     thumbnailR2Key: string | null;
@@ -60,6 +64,13 @@ export default function TestSeriesDetail() {
   const isFree = base === 0;
   const hasDiscount = !isFree && testSeries.discountPrice != null && testSeries.price > testSeries.discountPrice;
   const discountPct = hasDiscount ? Math.round((1 - testSeries.discountPrice! / testSeries.price) * 100) : 0;
+  const isComingSoon = testSeries.status === "coming_soon";
+
+  // Aggregate stats across the series' tests.
+  const totalQuestions = tests.reduce((s, t) => s + (t.questionCount || 0), 0);
+  const totalMarks = tests.reduce((s, t) => s + (t.totalMarks || 0), 0);
+  const totalDuration = tests.reduce((s, t) => s + (t.durationMinutes || 0), 0);
+  const passingPct = tests.length ? Math.max(...tests.map((t) => t.passingPct || 0)) : 40;
 
   const enroll = async () => {
     if (!user) return navigate("/login");
@@ -99,30 +110,57 @@ export default function TestSeriesDetail() {
           </nav>
 
           <div className="mt-8 max-w-3xl">
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-1.5 text-xs font-bold tracking-widest text-gold-200 shadow-sm backdrop-blur-md">
-              <Target size={14} className="text-gold-400" />
-              TEST SERIES
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-1.5 text-xs font-bold tracking-widest text-gold-200 shadow-sm backdrop-blur-md">
+                <Target size={14} className="text-gold-400" />
+                TEST SERIES
+              </div>
+              {testSeries.category && (
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-white/90 backdrop-blur-md">
+                  <Tag size={12} className="text-gold-400" /> {testSeries.category}
+                </div>
+              )}
+              {testSeries.difficulty && (
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-white/90 backdrop-blur-md">
+                  <BarChart3 size={12} className="text-gold-400" /> {testSeries.difficulty}
+                </div>
+              )}
+              {isComingSoon && (
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-gold-500 px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-ink shadow-sm">
+                  <Rocket size={12} /> Coming Soon
+                </div>
+              )}
             </div>
 
-            <h1 className="mt-2 font-display text-3xl font-bold leading-tight tracking-tight md:text-5xl">
+            <h1 className="mt-4 font-display text-3xl font-bold leading-tight tracking-tight md:text-5xl">
               {testSeries.title}
             </h1>
-            
+
             <p className="mt-4 max-w-2xl text-lg leading-relaxed text-white/70">
               Exam-grade practice tests to evaluate your readiness.
             </p>
 
             {/* Meta stats */}
-            <div className="mt-8 grid max-w-2xl grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="mt-8 grid max-w-3xl grid-cols-2 gap-3 sm:grid-cols-4">
               <div className="rounded-xl bg-white/10 px-4 py-3 ring-1 ring-white/15 backdrop-blur">
                 <FileText size={18} className="text-cta-400" />
-                <div className="mt-2 truncate font-display text-lg font-bold leading-none">{tests.length}</div>
-                <div className="mt-1 text-xs uppercase tracking-wide text-white/55">Mock Tests</div>
+                <div className="mt-2 truncate font-display text-lg font-bold leading-none">{totalQuestions}</div>
+                <div className="mt-1 text-xs uppercase tracking-wide text-white/55">Questions</div>
+              </div>
+              <div className="rounded-xl bg-white/10 px-4 py-3 ring-1 ring-white/15 backdrop-blur">
+                <Award size={18} className="text-cta-400" />
+                <div className="mt-2 truncate font-display text-lg font-bold leading-none">{totalMarks}</div>
+                <div className="mt-1 text-xs uppercase tracking-wide text-white/55">Total Marks</div>
               </div>
               <div className="rounded-xl bg-white/10 px-4 py-3 ring-1 ring-white/15 backdrop-blur">
                 <Clock size={18} className="text-cta-400" />
-                <div className="mt-2 truncate font-display text-lg font-bold leading-none">{testSeries.validityDays} Days</div>
-                <div className="mt-1 text-xs uppercase tracking-wide text-white/55">Validity</div>
+                <div className="mt-2 truncate font-display text-lg font-bold leading-none">{totalDuration} min</div>
+                <div className="mt-1 text-xs uppercase tracking-wide text-white/55">Duration</div>
+              </div>
+              <div className="rounded-xl bg-white/10 px-4 py-3 ring-1 ring-white/15 backdrop-blur">
+                <CheckCircle2 size={18} className="text-cta-400" />
+                <div className="mt-2 truncate font-display text-lg font-bold leading-none">{passingPct}%</div>
+                <div className="mt-1 text-xs uppercase tracking-wide text-white/55">To Pass</div>
               </div>
             </div>
           </div>
@@ -192,6 +230,22 @@ export default function TestSeriesDetail() {
                 </div>
               </div>
             </section>
+
+            {/* Instructions */}
+            <section className="rounded-2xl border border-border bg-white p-6 shadow-card md:p-7">
+              <div className="mb-5 flex items-center gap-3">
+                <h2 className="flex items-center gap-2.5 font-display text-xl font-bold tracking-tight text-ink">
+                  <ListChecks size={20} className="text-brand-600" /> Instructions
+                </h2>
+              </div>
+              <ul className="space-y-3 text-sm leading-relaxed text-muted">
+                <li className="flex gap-3"><span className="mt-0.5 text-gold-500">•</span> Each question carries {tests[0]?.totalMarks && tests[0]?.questionCount ? Math.round((tests[0].totalMarks / tests[0].questionCount) * 100) / 100 : 1} mark. There is <strong className="text-ink">no negative marking</strong>.</li>
+                <li className="flex gap-3"><span className="mt-0.5 text-gold-500">•</span> The test is timed at <strong className="text-ink">{totalDuration} minutes</strong> and auto-submits when the timer ends.</li>
+                <li className="flex gap-3"><span className="mt-0.5 text-gold-500">•</span> You need <strong className="text-ink">{passingPct}%</strong> to pass. Your score and analysis are shown immediately after submission.</li>
+                <li className="flex gap-3"><span className="mt-0.5 text-gold-500">•</span> Use the question palette to navigate; you can review and change answers before submitting.</li>
+                <li className="flex gap-3"><span className="mt-0.5 text-gold-500">•</span> Ensure a stable internet connection. Do not refresh or close the tab during the test.</li>
+              </ul>
+            </section>
           </div>
 
           {/* -------- RIGHT: sticky enroll card -------- */}
@@ -216,14 +270,23 @@ export default function TestSeriesDetail() {
                     <Clock size={14} /> {testSeries.validityDays} days access
                   </div>
 
-                  <button
-                    onClick={enroll}
-                    disabled={busy}
-                    className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-ink px-6 py-3.5 font-display font-bold text-white shadow-soft transition-all duration-300 hover:bg-gold-600 hover:text-ink disabled:opacity-60"
-                  >
-                    {busy ? "Processing…" : user ? (isFree ? "Enroll for free" : "Enroll now") : "Login to enroll"}
-                    {!busy && <ChevronRight size={18} />}
-                  </button>
+                  {isComingSoon ? (
+                    <button
+                      disabled
+                      className="mt-5 flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-dashed border-gold-300 bg-gold-50 px-6 py-3.5 font-display font-bold text-gold-700"
+                    >
+                      <Rocket size={18} /> Coming Soon
+                    </button>
+                  ) : (
+                    <button
+                      onClick={enroll}
+                      disabled={busy}
+                      className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-ink px-6 py-3.5 font-display font-bold text-white shadow-soft transition-all duration-300 hover:bg-gold-600 hover:text-ink disabled:opacity-60"
+                    >
+                      {busy ? "Processing…" : user ? (isFree ? "Enroll for free" : "Enroll now") : "Login to enroll"}
+                      {!busy && <ChevronRight size={18} />}
+                    </button>
+                  )}
                   {err && <p className="mt-2 text-center text-sm text-red-600">{err}</p>}
                 </div>
                 

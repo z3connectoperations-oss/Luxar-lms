@@ -40,6 +40,8 @@ adminTestSeries.post("/", async (c) => {
     descriptionMd: b.descriptionMd,
     thumbnailR2Key: b.thumbnailR2Key,
     bannerR2Key: b.bannerR2Key,
+    category: b.category ?? null,
+    difficulty: b.difficulty ?? null,
     price: b.price ?? 0,
     discountPrice: b.discountPrice ?? null,
     validityDays: b.validityDays ?? 365,

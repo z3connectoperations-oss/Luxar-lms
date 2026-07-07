@@ -185,6 +185,7 @@ admin.post("/courses", async (c) => {
     downloadableEnabled: b.downloadableEnabled ?? true,
     liveClassesEnabled: b.liveClassesEnabled ?? true,
     status: b.status || "draft",
+    position: b.position ?? 0,
     completionRule: b.completionRule || "allLessons",
     minProgressPct: b.minProgressPct ?? 100,
   });

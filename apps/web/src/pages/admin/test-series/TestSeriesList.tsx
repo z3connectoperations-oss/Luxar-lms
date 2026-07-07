@@ -8,7 +8,7 @@ interface TestSeries {
   id: string;
   title: string;
   slug: string;
-  status: "draft" | "published";
+  status: "draft" | "published" | "coming_soon";
   price: number;
   discountPrice: number | null;
   validityDays: number;
@@ -85,10 +85,14 @@ export default function AdminTestSeriesList() {
                   <h3 className="font-bold text-ink line-clamp-2">{ts.title}</h3>
                   <span
                     className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                      ts.status === "published" ? "bg-emerald-100 text-emerald-800" : "bg-neutral-100 text-neutral-600"
+                      ts.status === "published"
+                        ? "bg-emerald-100 text-emerald-800"
+                        : ts.status === "coming_soon"
+                        ? "bg-gold-100 text-gold-700"
+                        : "bg-neutral-100 text-neutral-600"
                     }`}
                   >
-                    {ts.status}
+                    {ts.status === "coming_soon" ? "Coming Soon" : ts.status}
                   </span>
                 </div>
                 <div className="text-xs text-muted mb-4">Slug: {ts.slug}</div>
