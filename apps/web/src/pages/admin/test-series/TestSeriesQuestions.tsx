@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Target, Plus, Edit2, Trash2, Search, Upload, Save } from "lucide-react";
+import { ArrowLeft, Target, Plus, Edit2, Trash2, Search, Upload, Save, Download } from "lucide-react";
 import { api } from "../../../lib/api";
 import { Input, Button, Textarea } from "../../../components/ui";
 import Papa from "papaparse";
@@ -35,6 +35,7 @@ export default function AdminTestSeriesQuestions() {
   const [editingQuestion, setEditingQuestion] = useState<Partial<Question>>({});
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
 
   const load = () => {
     setLoading(true);
@@ -118,45 +119,151 @@ export default function AdminTestSeriesQuestions() {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const processParsedData = async (parsed: any[]) => {
+    const qs = parsed.map((row, i) => ({
+      prompt: row.prompt || row.Question || row.Prompt || "",
+      optionA: row.optionA || row.OptionA || row.A || "",
+      optionB: row.optionB || row.OptionB || row.B || "",
+      optionC: row.optionC || row.OptionC || row.C || "",
+      optionD: row.optionD || row.OptionD || row.D || "",
+      correctAnswer: String(row.correctAnswer || row.CorrectAnswer || row.Correct || "A").toUpperCase(),
+      explanation: row.explanation || row.Explanation || "",
+      marks: parseInt(String(row.marks || row.Marks || "1"), 10),
+      position: questions.length + i,
+    }));
+
+    const filteredQs = qs.filter(q => q.prompt || q.optionA || q.optionB);
+
+    if (filteredQs.length === 0) {
+      alert("No valid questions found in the uploaded file.");
+      return;
+    }
+
+    try {
+      await api(`/admin/test-series/tests/${testId}/questions/import`, {
+        method: "POST",
+        body: JSON.stringify({ questions: filteredQs }),
+      });
+      alert(`Imported ${filteredQs.length} questions successfully`);
+      load();
+    } catch (err: any) {
+      alert("Import failed: " + err.message);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        const parsed = results.data as any[];
-        const qs = parsed.map((row, i) => ({
-          prompt: row.prompt || row.Question || row.Prompt || "",
-          optionA: row.optionA || row.OptionA || row.A || "",
-          optionB: row.optionB || row.OptionB || row.B || "",
-          optionC: row.optionC || row.OptionC || row.C || "",
-          optionD: row.optionD || row.OptionD || row.D || "",
-          correctAnswer: (row.correctAnswer || row.CorrectAnswer || row.Correct || "A").toUpperCase(),
-          explanation: row.explanation || row.Explanation || "",
-          marks: parseInt(row.marks || row.Marks || "1", 10),
-          position: questions.length + i,
-        }));
-
-        try {
-          // Send bulk insert request
-          await api(`/admin/test-series/tests/${testId}/questions/import`, {
-            method: "POST",
-            body: JSON.stringify({ questions: qs }),
-          });
-          alert("Imported successfully");
-          load();
-        } catch (err: any) {
-          alert("Import failed: " + err.message);
+    if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
+      const xlsx = await import("xlsx");
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = xlsx.read(data, { type: "array" });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const parsed = xlsx.utils.sheet_to_json(worksheet) as any[];
+        await processParsedData(parsed);
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: async (results) => {
+          await processParsedData(results.data as any[]);
+        },
+        error: (err) => {
+          alert("CSV Parse Error: " + err.message);
         }
-      },
-      error: (err) => {
-        alert("CSV Parse Error: " + err.message);
-      }
-    });
+      });
+    }
     
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLoading(true);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      
+      const pdfjsLib = await import("pdfjs-dist");
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let fullText = "";
+
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map((item: any) => item.str).join(" ");
+        fullText += pageText + " ";
+      }
+
+      // Regex to match question number, prompt, and options A, B, C, D
+      const questionsRegex = /(\d+)\.\s*(.*?)\s*A\)\s*(.*?)\s*B\)\s*(.*?)\s*C\)\s*(.*?)\s*D\)\s*(.*?)(?=(?:\d+\.\s*)|$)/gs;
+      
+      const extractedQs: Partial<Question>[] = [];
+      let match;
+
+      while ((match = questionsRegex.exec(fullText)) !== null) {
+        let prompt = match[2].trim();
+        let optionA = match[3].trim();
+        let optionB = match[4].trim();
+        let optionC = match[5].trim();
+        let optionD = match[6].trim();
+
+        // Strip Tamil text (unicode range \u0B80-\u0BFF) and subsequent options from Option D
+        const tamilRegex = /[\u0B80-\u0BFF]/;
+        const tamilMatch = tamilRegex.exec(optionD);
+        if (tamilMatch) {
+          optionD = optionD.substring(0, tamilMatch.index).trim();
+        }
+
+        extractedQs.push({
+          prompt,
+          optionA,
+          optionB,
+          optionC,
+          optionD,
+          correctAnswer: "A",
+          marks: 1,
+          position: questions.length + extractedQs.length,
+        });
+      }
+
+      if (extractedQs.length === 0) {
+        alert("Could not extract any questions. The PDF format might not match the expected pattern.");
+      } else {
+        await api(`/admin/test-series/tests/${testId}/questions/import`, {
+          method: "POST",
+          body: JSON.stringify({ questions: extractedQs }),
+        });
+        alert(`Successfully extracted and imported ${extractedQs.length} questions!`);
+        load();
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert("PDF Parsing failed: " + err.message);
+    } finally {
+      setLoading(false);
+      if (pdfInputRef.current) pdfInputRef.current.value = "";
+    }
+  };
+
+  const downloadFormat = () => {
+    const csvContent = "data:text/csv;charset=utf-8,Prompt,OptionA,OptionB,OptionC,OptionD,CorrectAnswer,Explanation,Marks\nSample Question,Option 1,Option 2,Option 3,Option 4,A,Sample Explanation,1";
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "question_import_format.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const filtered = questions.filter((question) => question.prompt.toLowerCase().includes(q.toLowerCase()));
@@ -179,13 +286,26 @@ export default function AdminTestSeriesQuestions() {
         <div className="flex gap-2">
           <input
             type="file"
-            accept=".csv"
+            accept=".csv, .xlsx, .xls"
             className="hidden"
             ref={fileInputRef}
             onChange={handleFileUpload}
           />
+          <input
+            type="file"
+            accept=".pdf"
+            className="hidden"
+            ref={pdfInputRef}
+            onChange={handlePdfUpload}
+          />
+          <Button variant="outline" onClick={() => pdfInputRef.current?.click()} className="gap-2">
+            <Upload size={16} /> Import PDF
+          </Button>
+          <Button variant="outline" onClick={downloadFormat} className="gap-2">
+            <Download size={16} /> CSV Format
+          </Button>
           <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="gap-2">
-            <Upload size={16} /> Import CSV
+            <Upload size={16} /> Import CSV/Excel
           </Button>
           <Button onClick={openNew} className="gap-2">
             <Plus size={16} /> Add Question
