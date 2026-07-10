@@ -323,13 +323,13 @@ export default function AdminTestSeriesQuestions() {
           />
           <input
             type="file"
-            accept=".pdf"
+            accept=".pdf,.docx,.doc"
             className="hidden"
             ref={pdfInputRef}
-            onChange={handlePdfUpload}
+            onChange={handleDocUpload}
           />
           <Button variant="outline" onClick={() => pdfInputRef.current?.click()} className="w-full gap-2 sm:w-auto">
-            <Upload size={16} /> Import PDF
+            <Upload size={16} /> Import PDF/Word
           </Button>
           <Button variant="outline" onClick={downloadFormat} className="w-full gap-2 sm:w-auto">
             <Download size={16} /> CSV Format
