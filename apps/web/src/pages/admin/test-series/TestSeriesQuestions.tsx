@@ -299,14 +299,25 @@ export default function AdminTestSeriesQuestions() {
   };
 
   const downloadFormat = () => {
-    const csvContent = "data:text/csv;charset=utf-8,Prompt,OptionA,OptionB,OptionC,OptionD,CorrectAnswer,Explanation,Marks\nSample Question,Option 1,Option 2,Option 3,Option 4,A,Sample Explanation,1";
-    const encodedUri = encodeURI(csvContent);
+    // Canonical import template. Headers are matched case/space-insensitively, and
+    // "Correct Answer" must be the letter A/B/C/D of the right option. Written as
+    // UTF-8 with a BOM so Excel opens Tamil/other scripts correctly.
+    const headers = ["Question", "Option A", "Option B", "Option C", "Option D", "Correct Answer", "Explanation", "Marks"];
+    const rows = [
+      ["What is the capital of India?", "Mumbai", "Chennai", "New Delhi", "Kolkata", "C", "New Delhi is the capital of India.", "1"],
+      ["தமிழ்நாட்டின் தலைநகரம் எது?", "மதுரை", "சென்னை", "கோயம்புத்தூர்", "திருச்சி", "B", "சென்னை தமிழ்நாட்டின் தலைநகரம் ஆகும்.", "1"],
+    ];
+    const esc = (v: string) => `"${String(v).replace(/"/g, '""')}"`;
+    const csv = [headers, ...rows].map((r) => r.map(esc).join(",")).join("\r\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "question_import_format.csv");
+    link.href = url;
+    link.download = "question_import_template.csv";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const filtered = questions.filter((question) => question.prompt.toLowerCase().includes(q.toLowerCase()));
