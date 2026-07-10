@@ -8,8 +8,9 @@ interface Test {
   id: string;
   testSeriesId: string;
   title: string;
-  durationMinutes: number;
-  totalMarks: number;
+  durationMin: number;
+  durationMinutes?: number; // UI-only alias used by the edit form
+  passingPct?: number;
   maxAttempts: number;
   status: "draft" | "published";
   position: number;
@@ -49,7 +50,6 @@ export default function AdminTestSeriesTests() {
     setEditingTest({
       title: "",
       durationMinutes: 60,
-      totalMarks: 100,
       maxAttempts: 3,
       status: "draft",
       position: tests.length,
@@ -58,21 +58,32 @@ export default function AdminTestSeriesTests() {
   };
 
   const openEdit = (t: Test) => {
-    setEditingTest({ ...t });
+    // API returns durationMin (not durationMinutes); map it so the field pre-fills.
+    setEditingTest({ ...t, durationMinutes: (t as any).durationMin ?? t.durationMinutes });
     setIsEditing(true);
   };
 
   const save = async () => {
+    // Send only real columns. totalMarks is derived from questions (no column),
+    // and the DB field is durationMin (not durationMinutes).
+    const payload = {
+      title: (editingTest.title || "").trim(),
+      durationMin: Number(editingTest.durationMinutes) || 60,
+      maxAttempts: Number(editingTest.maxAttempts) || 3,
+      status: editingTest.status || "draft",
+    };
+    if (!payload.title) return alert("Title is required.");
     try {
       if (editingTest.id) {
-        await api(`/admin/test-series/${id}/tests/${editingTest.id}`, {
+        // Tests are addressed by testId alone (no series id in the path).
+        await api(`/admin/test-series/tests/${editingTest.id}`, {
           method: "PATCH",
-          body: JSON.stringify(editingTest),
+          body: JSON.stringify(payload),
         });
       } else {
         await api(`/admin/test-series/${id}/tests`, {
           method: "POST",
-          body: JSON.stringify(editingTest),
+          body: JSON.stringify(payload),
         });
       }
       setIsEditing(false);
@@ -83,9 +94,9 @@ export default function AdminTestSeriesTests() {
   };
 
   const del = async (testId: string) => {
-    if (!confirm("Delete this test?")) return;
+    if (!confirm("Delete this test? This also removes its questions and attempts.")) return;
     try {
-      await api(`/admin/test-series/${id}/tests/${testId}`, { method: "DELETE" });
+      await api(`/admin/test-series/tests/${testId}`, { method: "DELETE" });
       load();
     } catch (e: any) {
       alert(e.message || "Delete failed");
@@ -150,7 +161,7 @@ export default function AdminTestSeriesTests() {
                     {t.title}
                   </td>
                   <td className="px-5 py-4 text-muted">
-                    {t.durationMinutes}m · {t.totalMarks} marks · {t.maxAttempts} attempts
+                    {t.durationMin}m · {t.maxAttempts} attempts
                   </td>
                   <td className="px-5 py-4">
                     <span
@@ -215,16 +226,6 @@ export default function AdminTestSeriesTests() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-bold uppercase text-muted">Total Marks</label>
-                  <Input
-                    type="number"
-                    value={editingTest.totalMarks || ""}
-                    onChange={(e) => setEditingTest({ ...editingTest, totalMarks: parseInt(e.target.value) || 0 })}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
                   <label className="mb-1 block text-xs font-bold uppercase text-muted">Max Attempts</label>
                   <Input
                     type="number"
@@ -232,17 +233,17 @@ export default function AdminTestSeriesTests() {
                     onChange={(e) => setEditingTest({ ...editingTest, maxAttempts: parseInt(e.target.value) || 0 })}
                   />
                 </div>
-                <div>
-                  <label className="mb-1 block text-xs font-bold uppercase text-muted">Status</label>
-                  <select
-                    value={editingTest.status || "draft"}
-                    onChange={(e) => setEditingTest({ ...editingTest, status: e.target.value as any })}
-                    className="h-10 w-full rounded-xl border border-border px-3 text-sm"
-                  >
-                    <option value="draft">Draft</option>
-                    <option value="published">Published</option>
-                  </select>
-                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase text-muted">Status</label>
+                <select
+                  value={editingTest.status || "draft"}
+                  onChange={(e) => setEditingTest({ ...editingTest, status: e.target.value as any })}
+                  className="h-10 w-full rounded-xl border border-border px-3 text-sm"
+                >
+                  <option value="draft">Draft</option>
+                  <option value="published">Published</option>
+                </select>
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-3">
