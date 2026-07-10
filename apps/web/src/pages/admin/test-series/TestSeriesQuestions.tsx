@@ -120,15 +120,28 @@ export default function AdminTestSeriesQuestions() {
   };
 
   const processParsedData = async (parsed: any[]) => {
+    // Match columns by a normalized header (case/space/punctuation-insensitive),
+    // so "Option A", "optionA", "OPTION_A" and "A" all resolve to the same field.
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const pick = (row: any, ...aliases: string[]): string => {
+      const map: Record<string, any> = {};
+      for (const k of Object.keys(row)) map[norm(k)] = row[k];
+      for (const a of aliases) {
+        const v = map[norm(a)];
+        if (v != null && String(v).trim() !== "") return String(v).trim();
+      }
+      return "";
+    };
+
     const qs = parsed.map((row, i) => ({
-      prompt: row.prompt || row.Question || row.Prompt || "",
-      optionA: row.optionA || row.OptionA || row.A || "",
-      optionB: row.optionB || row.OptionB || row.B || "",
-      optionC: row.optionC || row.OptionC || row.C || "",
-      optionD: row.optionD || row.OptionD || row.D || "",
-      correctAnswer: String(row.correctAnswer || row.CorrectAnswer || row.Correct || "A").toUpperCase(),
-      explanation: row.explanation || row.Explanation || "",
-      marks: parseInt(String(row.marks || row.Marks || "1"), 10),
+      prompt: pick(row, "prompt", "question", "questions", "ques"),
+      optionA: pick(row, "optionA", "option1", "A", "a)"),
+      optionB: pick(row, "optionB", "option2", "B", "b)"),
+      optionC: pick(row, "optionC", "option3", "C", "c)"),
+      optionD: pick(row, "optionD", "option4", "D", "d)"),
+      correctAnswer: (pick(row, "correctAnswer", "correct", "answer", "ans", "correctoption") || "A").toUpperCase(),
+      explanation: pick(row, "explanation", "explain", "solution", "reason"),
+      marks: parseInt(pick(row, "marks", "mark", "score") || "1", 10) || 1,
       position: questions.length + i,
     }));
 
