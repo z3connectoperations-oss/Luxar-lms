@@ -183,72 +183,102 @@ export default function AdminTestSeriesQuestions() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Turn raw document text into question objects.
+  // Expects a "1. <prompt> A) .. B) .. C) .. D) .." style layout (A. / A) both ok).
+  const parseTextToQuestions = (fullText: string): Partial<Question>[] => {
+    const questionsRegex = /(\d+)[.)]\s*(.*?)\s*A[).]\s*(.*?)\s*B[).]\s*(.*?)\s*C[).]\s*(.*?)\s*D[).]\s*(.*?)(?=(?:\d+[.)]\s*)|$)/gs;
+    const extracted: Partial<Question>[] = [];
+    let match;
+    while ((match = questionsRegex.exec(fullText)) !== null) {
+      const prompt = match[2].trim();
+      const optionA = match[3].trim();
+      const optionB = match[4].trim();
+      const optionC = match[5].trim();
+      let optionD = match[6].trim();
+
+      // Detect a marked answer at the tail (e.g. "Answer: B", "Ans - C", "Correct: D").
+      let correctAnswer: "A" | "B" | "C" | "D" = "A";
+      const ansMatch = optionD.match(/(?:answer|ans|correct)\s*[:\-)]?\s*([ABCD])\b/i);
+      if (ansMatch && ansMatch.index !== undefined) {
+        correctAnswer = ansMatch[1].toUpperCase() as "A" | "B" | "C" | "D";
+        optionD = optionD.slice(0, ansMatch.index).trim();
+      }
+
+      // Strip trailing Tamil text (bilingual docs) from the last option.
+      const tamilMatch = /[\u0B80-\u0BFF]/.exec(optionD);
+      if (tamilMatch) optionD = optionD.substring(0, tamilMatch.index).trim();
+
+      if (!prompt) continue;
+      extracted.push({
+        prompt,
+        optionA,
+        optionB,
+        optionC,
+        optionD,
+        correctAnswer,
+        marks: 1,
+        position: questions.length + extracted.length,
+      });
+    }
+    return extracted;
+  };
+
+  const extractPdfText = async (file: File): Promise<string> => {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdfjsLib = await import("pdfjs-dist");
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let fullText = "";
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      fullText += textContent.items.map((item: any) => item.str).join(" ") + " ";
+    }
+    return fullText;
+  };
+
+  const extractDocxText = async (file: File): Promise<string> => {
+    const arrayBuffer = await file.arrayBuffer();
+    // @ts-ignore - no type declarations for the browser build subpath
+    const mammoth = await import("mammoth/mammoth.browser");
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    return result?.value || "";
+  };
+
+  // Handles both PDF and Word (.docx) \u2014 extracts text, parses questions, imports.
+  const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setLoading(true);
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      
-      const pdfjsLib = await import("pdfjs-dist");
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      let fullText = "";
-
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items.map((item: any) => item.str).join(" ");
-        fullText += pageText + " ";
-      }
-
-      // Regex to match question number, prompt, and options A, B, C, D
-      const questionsRegex = /(\d+)\.\s*(.*?)\s*A\)\s*(.*?)\s*B\)\s*(.*?)\s*C\)\s*(.*?)\s*D\)\s*(.*?)(?=(?:\d+\.\s*)|$)/gs;
-      
-      const extractedQs: Partial<Question>[] = [];
-      let match;
-
-      while ((match = questionsRegex.exec(fullText)) !== null) {
-        let prompt = match[2].trim();
-        let optionA = match[3].trim();
-        let optionB = match[4].trim();
-        let optionC = match[5].trim();
-        let optionD = match[6].trim();
-
-        // Strip Tamil text (unicode range \u0B80-\u0BFF) and subsequent options from Option D
-        const tamilRegex = /[\u0B80-\u0BFF]/;
-        const tamilMatch = tamilRegex.exec(optionD);
-        if (tamilMatch) {
-          optionD = optionD.substring(0, tamilMatch.index).trim();
-        }
-
-        extractedQs.push({
-          prompt,
-          optionA,
-          optionB,
-          optionC,
-          optionD,
-          correctAnswer: "A",
-          marks: 1,
-          position: questions.length + extractedQs.length,
-        });
-      }
-
-      if (extractedQs.length === 0) {
-        alert("Could not extract any questions. The PDF format might not match the expected pattern.");
+      const name = file.name.toLowerCase();
+      let text = "";
+      if (name.endsWith(".pdf")) {
+        text = await extractPdfText(file);
+      } else if (name.endsWith(".docx") || name.endsWith(".doc")) {
+        text = await extractDocxText(file);
       } else {
-        await api(`/admin/test-series/tests/${testId}/questions/import`, {
-          method: "POST",
-          body: JSON.stringify({ questions: extractedQs }),
-        });
-        alert(`Successfully extracted and imported ${extractedQs.length} questions!`);
-        load();
+        throw new Error("Unsupported file type. Please upload a PDF or Word (.docx) file.");
       }
+
+      const extractedQs = parseTextToQuestions(text);
+      if (extractedQs.length === 0) {
+        alert(
+          "Could not extract any questions.\n\nExpected a format like:\n1. Question text  A) option  B) option  C) option  D) option\n\nOptionally add 'Answer: B' after the options."
+        );
+        return;
+      }
+
+      await api(`/admin/test-series/tests/${testId}/questions/import`, {
+        method: "POST",
+        body: JSON.stringify({ questions: extractedQs }),
+      });
+      alert(`Successfully extracted and imported ${extractedQs.length} questions!`);
+      load();
     } catch (err: any) {
       console.error(err);
-      alert("PDF Parsing failed: " + err.message);
+      alert("Document parsing failed: " + (err?.message || err));
     } finally {
       setLoading(false);
       if (pdfInputRef.current) pdfInputRef.current.value = "";
@@ -283,7 +313,7 @@ export default function AdminTestSeriesQuestions() {
             <p className="text-sm text-muted">For Test: {test?.title || "..."}</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
           <input
             type="file"
             accept=".csv, .xlsx, .xls"
@@ -298,16 +328,16 @@ export default function AdminTestSeriesQuestions() {
             ref={pdfInputRef}
             onChange={handlePdfUpload}
           />
-          <Button variant="outline" onClick={() => pdfInputRef.current?.click()} className="gap-2">
+          <Button variant="outline" onClick={() => pdfInputRef.current?.click()} className="w-full gap-2 sm:w-auto">
             <Upload size={16} /> Import PDF
           </Button>
-          <Button variant="outline" onClick={downloadFormat} className="gap-2">
+          <Button variant="outline" onClick={downloadFormat} className="w-full gap-2 sm:w-auto">
             <Download size={16} /> CSV Format
           </Button>
-          <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="gap-2">
+          <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="w-full gap-2 sm:w-auto">
             <Upload size={16} /> Import CSV/Excel
           </Button>
-          <Button onClick={openNew} className="gap-2">
+          <Button onClick={openNew} className="w-full gap-2 sm:w-auto">
             <Plus size={16} /> Add Question
           </Button>
         </div>
@@ -434,17 +464,17 @@ export default function AdminTestSeriesQuestions() {
                 />
               </div>
             </div>
-            <div className="mt-6 flex justify-end gap-3">
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end sm:gap-3">
               <button
                 onClick={() => setIsEditing(false)}
-                className="rounded-xl px-4 py-2 text-sm font-semibold text-muted hover:bg-canvas"
+                className="order-last rounded-xl px-4 py-2.5 text-sm font-semibold text-muted hover:bg-canvas sm:order-none"
               >
                 Cancel
               </button>
-              <Button variant="outline" onClick={() => save(true)}>
+              <Button variant="outline" onClick={() => save(true)} className="w-full justify-center sm:w-auto">
                 Save & Add Another
               </Button>
-              <Button onClick={() => save(false)} className="gap-2">
+              <Button onClick={() => save(false)} className="w-full justify-center gap-2 sm:w-auto">
                 <Save size={16}/> Save
               </Button>
             </div>

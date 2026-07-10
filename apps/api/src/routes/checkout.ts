@@ -465,7 +465,7 @@ checkout.post("/phonepe-webhook", async (c) => {
         userId: order.userId,
         invoiceNumber,
         amount: order.total,
-        businessDetails: "Luxaar Institute (A unit of SABI CONSTRUCTION)",
+        businessDetails: "Luxaar Institute (A unit of sabisha s)",
       });
     } catch (e) {
       console.error("Failed to generate invoice", e);

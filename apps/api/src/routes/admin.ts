@@ -743,7 +743,9 @@ admin.post("/mock-tests/:id/questions/import", async (c) => {
     position: nextPos++,
   }));
 
-  await db.insert(mockQuestions).values(toInsert);
+  for (let i = 0; i < toInsert.length; i += 50) {
+    await db.insert(mockQuestions).values(toInsert.slice(i, i + 50));
+  }
   return c.json({ ok: true, imported: toInsert.length });
 });
 

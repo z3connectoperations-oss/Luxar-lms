@@ -9,10 +9,10 @@ export default function Terms() {
       
       <div className="space-y-4 text-muted leading-relaxed">
         <p>
-          Welcome to Luxaar Institute. By continuing to browse and use this website and application, you are agreeing to comply with and be bound by the following terms and conditions of use, which, together with our Privacy Policy, govern <strong>Luxaar Institute (A unit of SABI CONSTRUCTION)</strong>'s relationship with you regarding this platform.
+          Welcome to Luxaar Institute. By continuing to browse and use this website and application, you are agreeing to comply with and be bound by the following terms and conditions of use, which, together with our Privacy Policy, govern <strong>Luxaar Institute (A unit of sabisha s)</strong>'s relationship with you regarding this platform.
         </p>
         <p>
-          The terms "Luxaar Institute," "SABI CONSTRUCTION," "us," or "we" refer to the owner of the website and application. The term "you" refers to the user or viewer of our platform.
+          The terms "Luxaar Institute," "sabisha s," "us," or "we" refer to the owner of the website and application. The term "you" refers to the user or viewer of our platform.
         </p>
         <p>The use of this platform is subject to the following terms:</p>
         

@@ -29,7 +29,7 @@ export default function RefundPolicy() {
         </ul>
         
         <p>
-          In the rare event that Luxaar Institute (A unit of SABI CONSTRUCTION) cancels a course or batch, you will be offered a full refund or the option to switch to an equivalent course.
+          In the rare event that Luxaar Institute (A unit of sabisha s) cancels a course or batch, you will be offered a full refund or the option to switch to an equivalent course.
         </p>
         
         <p>
@@ -43,7 +43,7 @@ export default function RefundPolicy() {
 
         <h2 className="text-2xl font-bold text-ink mt-8">Return Policy</h2>
         <p>
-          Since Luxaar Institute (A unit of SABI CONSTRUCTION) provides digital educational content and services, we do not ship physical goods. Therefore, <strong>we do not accept returns</strong>. All digital sales are final, subject only to the specific refund conditions outlined in this policy.
+          Since Luxaar Institute (A unit of sabisha s) provides digital educational content and services, we do not ship physical goods. Therefore, <strong>we do not accept returns</strong>. All digital sales are final, subject only to the specific refund conditions outlined in this policy.
         </p>
         
         <hr className="my-8 border-gray-200" />

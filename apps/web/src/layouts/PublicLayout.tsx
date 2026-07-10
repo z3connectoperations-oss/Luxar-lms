@@ -819,7 +819,7 @@ function Footer() {
         </div>
 
         <div className="flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 sm:flex-row">
-          <p className="text-sm text-white/40 text-center sm:text-left">© {new Date().getFullYear()} Luxaar Institute (A unit of SABI CONSTRUCTION). All rights reserved.</p>
+          <p className="text-sm text-white/40 text-center sm:text-left">© {new Date().getFullYear()} Luxaar Institute (A unit of sabisha s). All rights reserved.</p>
           <div className="flex flex-wrap justify-center gap-6 text-sm text-white/40">
             <Link to="/privacy" className="underline-offset-4 hover:text-white hover:underline">Privacy Policy</Link>
             <Link to="/terms" className="underline-offset-4 hover:text-white hover:underline">Terms and Conditions</Link>
