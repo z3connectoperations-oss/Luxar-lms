@@ -208,7 +208,17 @@ adminTestSeries.post("/tests/:testId/questions/import", async (c) => {
 });
 
 adminTestSeries.delete("/questions/:questionId", async (c) => {
-  await c.get("db").delete(testSeriesQuestions).where(eq(testSeriesQuestions.id, c.req.param("questionId")));
+  const db = c.get("db");
+  const questionId = c.req.param("questionId");
+  try {
+    // Remove attempt answers that reference this question first, otherwise the
+    // foreign key (test_series_attempt_answers.question_id) blocks the delete.
+    await db.run(sql`DELETE FROM test_series_attempt_answers WHERE question_id = ${questionId}`);
+    await db.delete(testSeriesQuestions).where(eq(testSeriesQuestions.id, questionId));
+  } catch (err: any) {
+    console.error("question delete failed", err);
+    return c.json({ error: "Delete failed: " + (err?.message || String(err)) }, 500);
+  }
   return c.json({ ok: true });
 });
 
