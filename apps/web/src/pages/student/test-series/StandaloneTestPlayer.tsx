@@ -51,11 +51,9 @@ export default function StandaloneTestPlayer() {
       api<any>(`/learn/test-series/tests/${testId}`)
         .then(d => {
           setData((prev: any) => ({ ...prev, test: d.test }));
-          const startedAt = new Date(data.attempt.createdAt || data.attempt.startedAt || Date.now()).getTime();
-          const durationSec = d.test.durationMinutes * 60;
-          const elapsed = Math.floor((Date.now() - startedAt) / 1000);
-          // For simplicity, just use durationSec - timeTakenSec from attempt if it was paused.
-          // In a real app we'd track time accurately.
+          // The API returns the column as durationMin (durationMinutes is a legacy alias).
+          const durationMin = Number(d.test.durationMin ?? d.test.durationMinutes) || 60;
+          const durationSec = durationMin * 60;
           const rem = Math.max(0, durationSec - (data.attempt.timeTakenSec || 0));
           setTimeLeft(rem);
           setLoading(false);
@@ -82,10 +80,11 @@ export default function StandaloneTestPlayer() {
 
   const saveAnswer = async (questionId: string, option: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: option }));
-    const durationSec = data.test.durationMinutes * 60;
+    const durationMin = Number(data.test.durationMin ?? data.test.durationMinutes) || 60;
+    const durationSec = durationMin * 60;
     await api(`/learn/test-series/attempts/${attemptId}/answer`, {
       method: "POST",
-      body: JSON.stringify({ questionId, selectedOption: option, timeTakenSec: durationSec - timeLeft })
+      body: JSON.stringify({ questionId, selectedOption: option, timeTakenSec: Math.max(0, durationSec - timeLeft) })
     });
   };
 
