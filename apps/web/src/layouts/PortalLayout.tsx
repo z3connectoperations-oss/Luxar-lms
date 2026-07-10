@@ -3,7 +3,7 @@ import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   GraduationCap, LayoutDashboard, BookOpen, CalendarDays, ClipboardCheck,
   Award, Users, Mic, ShoppingBag, MessageSquare, Globe, Download,
-  Bell, LogOut, LayoutGrid, Menu, X, Target, type LucideIcon,
+  Bell, LogOut, LayoutGrid, Menu, X, Target, UserCircle, type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { api } from "../lib/api";
@@ -35,6 +35,7 @@ const NAV: Record<string, Item[]> = {
     { label: "Courses", to: "/admin/courses", icon: BookOpen },
     { label: "Test Series", to: "/admin/test-series", icon: Target },
     { label: "Users", to: "/admin/users", icon: Users },
+    { label: "Students", to: "/admin/students", icon: UserCircle },
     { label: "Enrolled Courses", to: "/admin/enrollments", icon: GraduationCap },
     { label: "Enrolled Test Series", to: "/admin/enrollments/test-series", icon: Target },
     { label: "Leads", to: "/admin/leads", icon: MessageSquare },

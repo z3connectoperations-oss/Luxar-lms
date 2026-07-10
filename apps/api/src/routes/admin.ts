@@ -29,6 +29,9 @@ import {
   testSeriesTests,
   testSeriesQuestions,
   testSeriesAttempts,
+  lessonProgress,
+  certificates,
+  interviewSessions,
 } from "@luxar/db";
 import { requireRole } from "../middleware";
 import type { AppEnv } from "../types";
@@ -610,6 +613,135 @@ admin.get("/enrollments/courses/:courseId", async (c) => {
     course: { id: course.id, title: course.title, slug: course.slug, thumbnailR2Key: course.thumbnailR2Key, price: course.price, discountPrice: course.discountPrice },
     totalRevenuePaise,
     rows,
+  });
+});
+
+// ---- Students (unified per-student view) -----------------------------------
+// List of student users with their enrollment/attempt counts.
+admin.get("/students", async (c) => {
+  const db = c.get("db");
+  const studentUsers = await db.select().from(users).where(eq(users.role, "student")).orderBy(desc(users.createdAt)).all();
+
+  const courseEnr = await db.select({ userId: enrollments.userId }).from(enrollments).all();
+  const tsEnr = await db.select({ userId: testSeriesEnrollments.userId }).from(testSeriesEnrollments).all();
+  const tsAtt = await db.select({ userId: testSeriesAttempts.userId, status: testSeriesAttempts.status }).from(testSeriesAttempts).all();
+  const mockAtt = await db.select({ userId: mockAttempts.userId, status: mockAttempts.status }).from(mockAttempts).all();
+
+  const countBy = (rows: { userId: string }[], uid: string) => rows.filter((r) => r.userId === uid).length;
+
+  const students = studentUsers.map((u) => ({
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    phone: u.phone,
+    status: u.status,
+    createdAt: u.createdAt,
+    courseCount: countBy(courseEnr, u.id),
+    testSeriesCount: countBy(tsEnr, u.id),
+    testsAttempted:
+      tsAtt.filter((a) => a.userId === u.id && a.status === "submitted").length +
+      mockAtt.filter((a) => a.userId === u.id && a.status === "submitted").length,
+  }));
+  return c.json({ students });
+});
+
+// Full profile for one student: courses (+lesson completion, mock attempts, cert),
+// test series (+attempts/scores) and interview sessions.
+admin.get("/users/:id/profile", async (c) => {
+  const db = c.get("db");
+  const userId = c.req.param("id");
+  const user = await db.select().from(users).where(eq(users.id, userId)).get();
+  if (!user) return c.json({ error: "not found" }, 404);
+
+  const emptyIn = sql`0=1`;
+
+  // ---- Courses ----
+  const enrs = await db.select().from(enrollments).where(eq(enrollments.userId, userId)).orderBy(desc(enrollments.purchaseDate)).all();
+  const courseIds = enrs.map((e) => e.courseId);
+  const courseRows = courseIds.length ? await db.select().from(courses).where(inArray(courses.id, courseIds)).all() : [];
+  const mods = courseIds.length ? await db.select({ id: modules.id, courseId: modules.courseId }).from(modules).where(inArray(modules.courseId, courseIds)).all() : [];
+  const modIds = mods.map((m) => m.id);
+  const lsns = modIds.length ? await db.select({ id: lessons.id, moduleId: lessons.moduleId }).from(lessons).where(inArray(lessons.moduleId, modIds)).all() : [];
+  const lprog = await db.select({ lessonId: lessonProgress.lessonId, completed: lessonProgress.completed }).from(lessonProgress).where(eq(lessonProgress.userId, userId)).all();
+  const doneLessonIds = new Set(lprog.filter((p) => p.completed).map((p) => p.lessonId));
+  const mockTestRows = courseIds.length ? await db.select({ id: mockTests.id, courseId: mockTests.courseId }).from(mockTests).where(inArray(mockTests.courseId, courseIds)).all() : [];
+  const userMockAtts = await db.select().from(mockAttempts).where(eq(mockAttempts.userId, userId)).all();
+  const certs = await db.select({ courseId: certificates.courseId, status: certificates.status }).from(certificates).where(eq(certificates.userId, userId)).all();
+
+  const coursesOut = enrs.map((e) => {
+    const co = courseRows.find((x) => x.id === e.courseId);
+    const cModIds = mods.filter((m) => m.courseId === e.courseId).map((m) => m.id);
+    const cLessons = lsns.filter((l) => cModIds.includes(l.moduleId));
+    const lessonsTotal = cLessons.length;
+    const lessonsCompleted = cLessons.filter((l) => doneLessonIds.has(l.id)).length;
+    const cMockTestIds = mockTestRows.filter((mt) => mt.courseId === e.courseId).map((mt) => mt.id);
+    const cMockAtts = userMockAtts.filter((a) => cMockTestIds.includes(a.mockTestId) && a.status === "submitted");
+    return {
+      courseId: e.courseId,
+      title: co?.title ?? "Course",
+      slug: co?.slug ?? null,
+      thumbnailR2Key: co?.thumbnailR2Key ?? null,
+      progressPct: e.progressPct ?? 0,
+      lessonsCompleted,
+      lessonsTotal,
+      enrolledAt: e.purchaseDate,
+      expiryDate: e.expiryDate,
+      certified: certs.some((ct) => ct.courseId === e.courseId && ct.status === "issued"),
+      mockAttempts: cMockAtts.map((a) => ({ score: a.score ?? 0, correctCount: a.correctCount ?? 0, submittedAt: a.submittedAt })),
+    };
+  });
+
+  // ---- Test series ----
+  const tsEnrs = await db.select().from(testSeriesEnrollments).where(eq(testSeriesEnrollments.userId, userId)).orderBy(desc(testSeriesEnrollments.purchaseDate)).all();
+  const tsIds = tsEnrs.map((e) => e.testSeriesId);
+  const tsRows = tsIds.length ? await db.select().from(testSeries).where(inArray(testSeries.id, tsIds)).all() : [];
+  const tsTests = tsIds.length ? await db.select().from(testSeriesTests).where(inArray(testSeriesTests.testSeriesId, tsIds)).all() : [];
+  const tsTestIds = tsTests.map((t) => t.id);
+  const tsAtts = await db.select().from(testSeriesAttempts).where(and(eq(testSeriesAttempts.userId, userId), tsTestIds.length ? inArray(testSeriesAttempts.testId, tsTestIds) : emptyIn)).all();
+  const tsQs = tsTestIds.length ? await db.select({ testId: testSeriesQuestions.testId, marks: testSeriesQuestions.marks }).from(testSeriesQuestions).where(inArray(testSeriesQuestions.testId, tsTestIds)).all() : [];
+  const marksByTest = new Map<string, number>();
+  for (const q of tsQs) marksByTest.set(q.testId, (marksByTest.get(q.testId) || 0) + (q.marks || 0));
+
+  const testSeriesOut = tsEnrs.map((e) => {
+    const ts = tsRows.find((x) => x.id === e.testSeriesId);
+    const seriesTestIds = tsTests.filter((t) => t.testSeriesId === e.testSeriesId).map((t) => t.id);
+    const attempts = tsAtts
+      .filter((a) => seriesTestIds.includes(a.testId) && a.status === "submitted")
+      .map((a) => {
+        const t = tsTests.find((x) => x.id === a.testId);
+        return { testId: a.testId, testTitle: t?.title ?? "Test", score: a.score ?? 0, correctCount: a.correctCount ?? 0, totalMarks: marksByTest.get(a.testId) ?? 0, submittedAt: a.submittedAt };
+      });
+    return {
+      testSeriesId: e.testSeriesId,
+      title: ts?.title ?? "Test Series",
+      slug: ts?.slug ?? null,
+      thumbnailR2Key: ts?.thumbnailR2Key ?? null,
+      enrolledAt: e.purchaseDate,
+      expiryDate: e.expiryDate,
+      testsCompleted: new Set(attempts.map((a) => a.testId)).size,
+      totalTests: seriesTestIds.length,
+      attempts,
+    };
+  });
+
+  // ---- Interviews ----
+  const interviews = await db.select().from(interviewSessions).where(eq(interviewSessions.userId, userId)).all();
+
+  return c.json({
+    user: {
+      id: user.id, name: user.name, email: user.email, phone: user.phone,
+      status: user.status, role: user.role, createdAt: user.createdAt, avatarR2Key: user.avatarR2Key,
+    },
+    courses: coursesOut,
+    testSeries: testSeriesOut,
+    interviews: interviews.map((i) => ({ id: i.id, scheduledAt: i.scheduledAt, status: i.status, feedbackMd: i.feedbackMd })),
+    summary: {
+      courseCount: coursesOut.length,
+      testSeriesCount: testSeriesOut.length,
+      testsAttempted:
+        testSeriesOut.reduce((s, t) => s + t.attempts.length, 0) +
+        coursesOut.reduce((s, cc) => s + cc.mockAttempts.length, 0),
+    },
   });
 });
 

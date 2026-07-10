@@ -66,6 +66,13 @@ export default function TestSeriesEnrollmentDetail() {
                       <div className="text-xs text-muted">
                         Enrolled {new Date(u.enrolledAt).toLocaleDateString()}
                       </div>
+                      <Link
+                        to={`/admin/students/${u.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 rounded-lg border border-gold-300 bg-gold-50 px-3 py-1.5 text-xs font-semibold text-gold-700 transition hover:bg-gold-100"
+                      >
+                        Profile
+                      </Link>
                     </div>
                   </div>
                   

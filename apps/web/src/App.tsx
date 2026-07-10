@@ -43,6 +43,8 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminCourses from "./pages/admin/Courses";
 import AdminCourseEdit from "./pages/admin/CourseEdit";
 import AdminUsers from "./pages/admin/Users";
+import AdminStudents from "./pages/admin/Students";
+import AdminStudentProfile from "./pages/admin/StudentProfile";
 import AdminEnrollments from "./pages/admin/Enrollments";
 import AdminEnrollmentDetail from "./pages/admin/EnrollmentDetail";
 import AdminTestSeriesEnrollments from "./pages/admin/TestSeriesEnrollments";
@@ -159,6 +161,8 @@ export default function App() {
             <Route path="/admin/modules/:moduleId/mock-test" element={<AdminMockTestManage />} />
             <Route path="/admin/exams" element={<AdminExams />} />
             <Route path="/admin/users" element={<AdminUsers />} />
+            <Route path="/admin/students" element={<AdminStudents />} />
+            <Route path="/admin/students/:id" element={<AdminStudentProfile />} />
             <Route path="/admin/enrollments" element={<AdminEnrollments />} />
             <Route path="/admin/enrollments/:courseId" element={<AdminEnrollmentDetail />} />
             <Route path="/admin/enrollments/test-series" element={<AdminTestSeriesEnrollments />} />

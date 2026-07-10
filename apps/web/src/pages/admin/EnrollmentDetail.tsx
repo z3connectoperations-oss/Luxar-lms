@@ -107,7 +107,9 @@ export default function EnrollmentDetail() {
             ) : filtered.map((r) => (
               <tr key={r.enrollmentId} className="odd:bg-card even:bg-canvas hover:bg-brand-50/50">
                 <td className="border-b border-r border-border px-3 py-1.5 text-center font-medium text-muted">{r.sl}</td>
-                <td className="border-b border-r border-border px-3 py-1.5 font-medium text-ink">{r.name}</td>
+                <td className="border-b border-r border-border px-3 py-1.5 font-medium">
+                  <Link to={`/admin/students/${r.userId}`} className="text-gold-700 hover:text-gold-800 hover:underline">{r.name}</Link>
+                </td>
                 <td className="border-b border-r border-border px-3 py-1.5 text-muted">{r.email}</td>
                 <td className="border-b border-r border-border px-3 py-1.5 text-muted">{r.phone || "—"}</td>
                 <td className="border-b border-r border-border px-3 py-1.5 text-muted">{fmt(r.enrolledAt)}</td>
