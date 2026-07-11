@@ -72,6 +72,124 @@ admin.get("/stats", async (c) => {
   });
 });
 
+// ---- Dashboard analytics (revenue, payments, activity) ---------------------
+admin.get("/dashboard", async (c) => {
+  const db = c.get("db");
+
+  const [courseCount, studentCount, trainerCount, variantCount, courseEnrollCount, tsEnrollCount] = await Promise.all([
+    db.$count(courses),
+    db.$count(users, eq(users.role, "student")),
+    db.$count(users, eq(users.role, "trainer")),
+    db.$count(courseVariants),
+    db.$count(enrollments),
+    db.$count(testSeriesEnrollments),
+  ]);
+
+  // Reference maps (small tables) to resolve names.
+  const [allCourses, allVariants, allSeries] = await Promise.all([
+    db.select({ id: courses.id, title: courses.title }).from(courses).all(),
+    db.select({ id: courseVariants.id, courseId: courseVariants.courseId }).from(courseVariants).all(),
+    db.select({ id: testSeries.id, title: testSeries.title }).from(testSeries).all(),
+  ]);
+  const courseTitle = new Map(allCourses.map((x) => [x.id, x.title]));
+  const variantCourse = new Map(allVariants.map((x) => [x.id, x.courseId]));
+  const seriesTitle = new Map(allSeries.map((x) => [x.id, x.title]));
+
+  // Paid orders → revenue metrics.
+  const paidOrders = await db.select().from(orders).where(eq(orders.status, "paid")).orderBy(desc(orders.createdAt)).all();
+  const totalRevenue = paidOrders.reduce((s, o) => s + (o.total || 0), 0);
+  const verifiedRevenue = paidOrders.filter((o) => o.paymentVerified).reduce((s, o) => s + (o.total || 0), 0);
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const monthRevenue = paidOrders
+    .filter((o) => o.createdAt && o.createdAt.getTime() >= monthStart)
+    .reduce((s, o) => s + (o.total || 0), 0);
+
+  // Revenue for the last 6 months (for the mini chart).
+  const revenueByMonth: { label: string; revenue: number }[] = [];
+  const buckets: { start: number; end: number; revenue: number }[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const end = new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime();
+    buckets.push({ start: d.getTime(), end, revenue: 0 });
+    revenueByMonth.push({ label: d.toLocaleString("en-IN", { month: "short" }), revenue: 0 });
+  }
+  for (const o of paidOrders) {
+    const t = o.createdAt?.getTime();
+    if (!t) continue;
+    const idx = buckets.findIndex((b) => t >= b.start && t < b.end);
+    if (idx >= 0) revenueByMonth[idx].revenue += o.total || 0;
+  }
+
+  // Recent payments (last 8 paid orders) with buyer + item title.
+  const recentPaid = paidOrders.slice(0, 8);
+  const rpUserIds = [...new Set(recentPaid.map((o) => o.userId))];
+  const rpUsers = rpUserIds.length ? await db.select({ id: users.id, name: users.name, email: users.email }).from(users).where(inArray(users.id, rpUserIds)).all() : [];
+  const userById = new Map(rpUsers.map((u) => [u.id, u]));
+  const rpItems = recentPaid.length ? await db.select().from(orderItems).where(inArray(orderItems.orderId, recentPaid.map((o) => o.id))).all() : [];
+  const itemName = (orderId: string) => {
+    const it = rpItems.find((i) => i.orderId === orderId);
+    if (!it) return "—";
+    if (it.kind === "course" && it.courseVariantId) return courseTitle.get(variantCourse.get(it.courseVariantId) || "") || "Course";
+    if (it.kind === "course-direct" && it.productId) return courseTitle.get(it.productId) || "Course";
+    if (it.kind === "test-series" && it.productId) return seriesTitle.get(it.productId) || "Test Series";
+    return it.kind === "product" ? "Store product" : "Order";
+  };
+  const recentPayments = recentPaid.map((o) => ({
+    id: o.id,
+    userName: userById.get(o.userId)?.name || "—",
+    userEmail: userById.get(o.userId)?.email || "",
+    item: itemName(o.id),
+    amount: o.total || 0,
+    provider: o.paymentProvider || "—",
+    verified: !!o.paymentVerified,
+    date: o.createdAt,
+  }));
+
+  // Recent student activity: latest course + test-series enrolments merged.
+  const [recentCourseEnr, recentTsEnr] = await Promise.all([
+    db.select().from(enrollments).orderBy(desc(enrollments.purchaseDate)).limit(8).all(),
+    db.select().from(testSeriesEnrollments).orderBy(desc(testSeriesEnrollments.purchaseDate)).limit(8).all(),
+  ]);
+  const actUserIds = [...new Set([...recentCourseEnr.map((e) => e.userId), ...recentTsEnr.map((e) => e.userId)])];
+  const actUsers = actUserIds.length ? await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, actUserIds)).all() : [];
+  const actUserName = new Map(actUsers.map((u) => [u.id, u.name]));
+  const activity = [
+    ...recentCourseEnr.map((e) => ({ type: "course" as const, userName: actUserName.get(e.userId) || "—", item: courseTitle.get(e.courseId) || "Course", date: e.purchaseDate })),
+    ...recentTsEnr.map((e) => ({ type: "test-series" as const, userName: actUserName.get(e.userId) || "—", item: seriesTitle.get(e.testSeriesId) || "Test Series", date: e.purchaseDate })),
+  ]
+    .sort((a, b) => (b.date?.getTime() || 0) - (a.date?.getTime() || 0))
+    .slice(0, 8);
+
+  // Top courses by enrolment count.
+  const allEnr = await db.select({ courseId: enrollments.courseId }).from(enrollments).all();
+  const enrByCourse = new Map<string, number>();
+  for (const e of allEnr) enrByCourse.set(e.courseId, (enrByCourse.get(e.courseId) || 0) + 1);
+  const topCourses = [...enrByCourse.entries()]
+    .map(([id, count]) => ({ title: courseTitle.get(id) || "Course", count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  return c.json({
+    counts: {
+      courses: courseCount,
+      students: studentCount,
+      trainers: trainerCount,
+      variants: variantCount,
+      enrollments: courseEnrollCount + tsEnrollCount,
+      courseEnrollments: courseEnrollCount,
+      testSeriesEnrollments: tsEnrollCount,
+      paidOrders: paidOrders.length,
+    },
+    revenue: { total: totalRevenue, verified: verifiedRevenue, thisMonth: monthRevenue },
+    revenueByMonth,
+    recentPayments,
+    activity,
+    topCourses,
+  });
+});
+
 // ---- Leads / Enquiries ----------------------------------------------------
 admin.get("/leads", async (c) => {
   const list = await c.get("db").select().from(leads).orderBy(desc(leads.createdAt)).all();
