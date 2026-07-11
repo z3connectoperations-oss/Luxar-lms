@@ -8,6 +8,9 @@ account_id = "1f6017fad93779c91706814678fa120a"
 # Runtime configuration variables
 CORS_ORIGIN = "https://luxaarinstitute.luxaarcompany.com"
 FIREBASE_PROJECT_ID = "luxar-firebase"
+# PhonePe: production API + where the buyer is returned after paying.
+PHONEPE_ENV = "production"
+PHONEPE_REDIRECT_URL = "https://luxaarinstitute.luxaarcompany.com/payment/result"
 
 [[d1_databases]]
 binding = "DB"

@@ -1,5 +1,7 @@
 import { Hono } from "hono";
-import { sql } from "drizzle-orm";
+import { sql, eq } from "drizzle-orm";
+import { orders } from "@luxar/db";
+import { fulfill } from "./checkout";
 import type { AppEnv } from "../types";
 
 /**
@@ -13,10 +15,9 @@ import type { AppEnv } from "../types";
  *   credentials configured in the PhonePe Business Dashboard. We recompute that
  *   hash from our stored secrets and compare (timing-safe, case-insensitive).
  *
- * This first phase ONLY: authenticates, parses, records idempotently, logs
- * non-sensitive metadata, and returns 200. It intentionally does NOT unlock any
- * course or test series — fulfilment will be gated by a later Order Status API
- * verification step.
+ * Flow: authenticate → parse → record idempotently → log non-sensitive metadata →
+ * on payload.state === "COMPLETED", fulfil the matching order (enrol the student),
+ * guarded by order.paymentVerified so duplicate deliveries never double-enrol → 200.
  */
 const paymentsWebhook = new Hono<AppEnv>();
 
@@ -100,7 +101,32 @@ paymentsWebhook.post("/phonepe/webhook", async (c) => {
     `[phonepe-webhook] received event=${event} state=${state ?? "-"} orderId=${orderId ?? "-"} merchantOrderId=${merchantOrderId ?? "-"}`
   );
 
-  // --- 5. Acknowledge. (No fulfilment yet — see file header.) ---
+  // --- 5. Fulfil on a COMPLETED payment (idempotent) ---
+  // This is the authoritative server-to-server confirmation; the redirect
+  // status-check does the same and both are guarded by order.paymentVerified,
+  // so an enrolment can never be created twice.
+  if (state === "COMPLETED" && merchantOrderId) {
+    try {
+      const db = c.get("db");
+      const order = await db.select().from(orders).where(eq(orders.merchantTransactionId, merchantOrderId)).get();
+      if (order && !order.paymentVerified) {
+        await db.update(orders).set({
+          status: "paid",
+          paymentStatus: "SUCCESS",
+          paymentVerified: true,
+          webhookReceived: true,
+          paymentCompletedAt: new Date(),
+          phonepeTransactionId: orderId,
+        }).where(eq(orders.id, order.id));
+        await fulfill(db, c.env, order.userId, order.id);
+        console.log(`[phonepe-webhook] fulfilled order merchantOrderId=${merchantOrderId}`);
+      }
+    } catch (e) {
+      console.error("[phonepe-webhook] fulfilment error:", e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  // --- 6. Acknowledge ---
   return c.json({ success: true }, 200);
 });
 

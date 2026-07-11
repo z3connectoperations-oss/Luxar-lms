@@ -1,135 +1,146 @@
 import type { AppEnv } from "../../types";
 import type { PaymentProvider, PaymentRequest } from "./PaymentProvider";
 
+type Env = AppEnv["Bindings"];
+
+/**
+ * PhonePe Standard Checkout v2 (OAuth) provider.
+ *
+ * Uses the current PhonePe PG API:
+ *  - OAuth token:  POST {identity}/v1/oauth/token   (client_credentials)
+ *  - Create pay:   POST {pg}/checkout/v2/pay         (Authorization: O-Bearer <token>)
+ *  - Order status: GET  {pg}/checkout/v2/order/{merchantOrderId}/status
+ *
+ * Credentials come from Worker secrets: PHONEPE_CLIENT_ID / PHONEPE_CLIENT_SECRET /
+ * PHONEPE_CLIENT_VERSION. Nothing is hardcoded. Webhooks are authenticated
+ * separately in routes/paymentsWebhook.ts (SHA256(username:password)).
+ */
+
+// Access-token cache (per Worker isolate). Refreshed before expiry.
+let cachedToken: { token: string; expiresAt: number } | null = null;
+
 export class PhonePeProvider implements PaymentProvider {
   name = "phonepe";
 
-  private async sha256(message: string): Promise<string> {
-    const msgBuffer = new TextEncoder().encode(message);
-    const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+  private bases(env: Env) {
+    const sandbox = (env.PHONEPE_ENV || "production").toLowerCase() === "sandbox";
+    return sandbox
+      ? {
+          identity: "https://api-preprod.phonepe.com/apis/pg-sandbox",
+          pg: "https://api-preprod.phonepe.com/apis/pg-sandbox",
+        }
+      : {
+          identity: "https://api.phonepe.com/apis/identity-manager",
+          pg: "https://api.phonepe.com/apis/pg",
+        };
   }
 
-  async createPayment(req: PaymentRequest, env: AppEnv["Bindings"]) {
-    const merchantId = env.PHONEPE_MERCHANT_ID;
-    const saltKey = env.PHONEPE_SALT_KEY;
-    const saltIndex = env.PHONEPE_SALT_INDEX;
-    const baseUrl = env.PHONEPE_BASE_URL || "https://api-preprod.phonepe.com/apis/pg-sandbox";
-
-    if (!merchantId || !saltKey || !saltIndex) {
-      console.error("PhonePe credentials missing.");
+  private async getAccessToken(env: Env): Promise<string | null> {
+    const clientId = env.PHONEPE_CLIENT_ID;
+    const clientSecret = env.PHONEPE_CLIENT_SECRET;
+    const clientVersion = env.PHONEPE_CLIENT_VERSION;
+    if (!clientId || !clientSecret || !clientVersion) {
+      console.error("PhonePe: client credentials missing.");
       return null;
     }
 
-    const payload = {
-      merchantId,
-      merchantTransactionId: req.merchantTransactionId,
-      merchantUserId: req.userId,
-      amount: req.amount * 100, // PhonePe expects amount in paise
-      redirectUrl: env.PHONEPE_REDIRECT_URL || "http://localhost:5173/payment/result",
-      redirectMode: "REDIRECT",
-      callbackUrl: env.PHONEPE_CALLBACK_URL || "http://localhost:8787/checkout/phonepe-webhook",
-      mobileNumber: req.mobileNumber || "9999999999",
-      paymentInstrument: {
-        type: "PAY_PAGE",
+    const now = Math.floor(Date.now() / 1000);
+    if (cachedToken && cachedToken.expiresAt - 60 > now) return cachedToken.token;
+
+    const url = `${this.bases(env).identity}/v1/oauth/token`;
+    const form = new URLSearchParams({
+      client_id: clientId,
+      client_version: clientVersion,
+      client_secret: clientSecret,
+      grant_type: "client_credentials",
+    });
+
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: form.toString(),
+      });
+      const data = (await res.json()) as any;
+      if (!res.ok || !data?.access_token) {
+        console.error("PhonePe OAuth failed:", res.status);
+        return null;
+      }
+      cachedToken = {
+        token: data.access_token,
+        expiresAt: typeof data.expires_at === "number" ? data.expires_at : now + 3000,
+      };
+      return cachedToken.token;
+    } catch {
+      console.error("PhonePe OAuth request error.");
+      return null;
+    }
+  }
+
+  async createPayment(req: PaymentRequest, env: Env) {
+    const token = await this.getAccessToken(env);
+    if (!token) return null;
+
+    // PhonePe returns the buyer here after the transaction; PaymentResult.tsx then
+    // polls /checkout/status/:transactionId to verify and unlock.
+    const resultBase = env.PHONEPE_REDIRECT_URL || "https://luxaarinstitute.luxaarcompany.com/payment/result";
+    const redirectUrl = `${resultBase}?transactionId=${encodeURIComponent(req.merchantTransactionId)}`;
+
+    const body = {
+      merchantOrderId: req.merchantTransactionId,
+      amount: req.amount, // already in paise; PhonePe minimum is 100 (₹1)
+      paymentFlow: {
+        type: "PG_CHECKOUT",
+        merchantUrls: { redirectUrl },
       },
     };
 
-    const base64Payload = btoa(JSON.stringify(payload));
-    const endpoint = "/pg/v1/pay";
-    const checksum = (await this.sha256(base64Payload + endpoint + saltKey)) + "###" + saltIndex;
-
     try {
-      const response = await fetch(`${baseUrl}${endpoint}`, {
+      const res = await fetch(`${this.bases(env).pg}/checkout/v2/pay`, {
         method: "POST",
         headers: {
-          accept: "application/json",
           "Content-Type": "application/json",
-          "X-VERIFY": checksum,
+          Authorization: `O-Bearer ${token}`,
         },
-        body: JSON.stringify({ request: base64Payload }),
+        body: JSON.stringify(body),
       });
-
-      const data = (await response.json()) as any;
-      if (data.success && data.data?.instrumentResponse?.redirectInfo?.url) {
-        return { redirectUrl: data.data.instrumentResponse.redirectInfo.url };
+      const data = (await res.json()) as any;
+      if (res.ok && data?.redirectUrl) {
+        return { redirectUrl: data.redirectUrl as string };
       }
-      console.error("PhonePe Pay Error:", JSON.stringify(data));
+      console.error("PhonePe create-payment error:", res.status, JSON.stringify(data).slice(0, 300));
       return null;
-    } catch (e) {
-      console.error("PhonePe Request Error:", e);
+    } catch {
+      console.error("PhonePe create-payment request error.");
       return null;
     }
   }
 
-  async getPaymentStatus(merchantTransactionId: string, env: AppEnv["Bindings"]) {
-    const merchantId = env.PHONEPE_MERCHANT_ID;
-    const saltKey = env.PHONEPE_SALT_KEY;
-    const saltIndex = env.PHONEPE_SALT_INDEX;
-    const baseUrl = env.PHONEPE_BASE_URL || "https://api-preprod.phonepe.com/apis/pg-sandbox";
-
-    if (!merchantId || !saltKey || !saltIndex) return null;
-
-    const endpoint = `/pg/v1/status/${merchantId}/${merchantTransactionId}`;
-    const checksum = (await this.sha256(endpoint + saltKey)) + "###" + saltIndex;
+  async getPaymentStatus(merchantTransactionId: string, env: Env) {
+    const token = await this.getAccessToken(env);
+    if (!token) return null;
 
     try {
-      const response = await fetch(`${baseUrl}${endpoint}`, {
-        method: "GET",
-        headers: {
-          accept: "application/json",
-          "Content-Type": "application/json",
-          "X-VERIFY": checksum,
-          "X-MERCHANT-ID": merchantId,
-        },
-      });
-
-      const data = (await response.json()) as any;
+      const res = await fetch(
+        `${this.bases(env).pg}/checkout/v2/order/${encodeURIComponent(merchantTransactionId)}/status`,
+        { method: "GET", headers: { Authorization: `O-Bearer ${token}` } }
+      );
+      const data = (await res.json()) as any;
       const rawResponse = JSON.stringify(data);
-      const providerTransactionId = data.data?.transactionId;
+      const providerTransactionId = data?.paymentDetails?.[0]?.transactionId || data?.orderId;
+      const state = data?.state;
 
-      if (data.code === "PAYMENT_SUCCESS") {
-        return { status: "SUCCESS" as const, providerTransactionId, rawResponse };
-      } else if (data.code === "PAYMENT_PENDING") {
-        return { status: "PENDING" as const, providerTransactionId, rawResponse };
-      } else {
-        return { status: "FAILED" as const, providerTransactionId, rawResponse };
-      }
-    } catch (e) {
+      if (state === "COMPLETED") return { status: "SUCCESS" as const, providerTransactionId, rawResponse };
+      if (state === "PENDING") return { status: "PENDING" as const, providerTransactionId, rawResponse };
+      return { status: "FAILED" as const, providerTransactionId, rawResponse };
+    } catch {
       return null;
     }
   }
 
-  async verifyWebhook(payloadRaw: any, signature: string, env: AppEnv["Bindings"]) {
-    const saltKey = env.PHONEPE_SALT_KEY;
-    const saltIndex = env.PHONEPE_SALT_INDEX;
-
-    if (!saltKey || !saltIndex) {
-      return { isValid: false };
-    }
-
-    try {
-      // payloadRaw is { response: "base64..." }
-      const base64Response = payloadRaw.response;
-      const calculatedChecksum = (await this.sha256(base64Response + saltKey)) + "###" + saltIndex;
-
-      if (calculatedChecksum !== signature) {
-        return { isValid: false };
-      }
-
-      const decoded = JSON.parse(atob(base64Response));
-      const merchantTransactionId = decoded.data?.merchantTransactionId;
-      const providerTransactionId = decoded.data?.transactionId;
-      const rawResponse = JSON.stringify(decoded);
-
-      if (decoded.code === "PAYMENT_SUCCESS") {
-        return { isValid: true, status: "SUCCESS" as const, merchantTransactionId, providerTransactionId, rawResponse };
-      }
-
-      return { isValid: true, status: "FAILED" as const, merchantTransactionId, providerTransactionId, rawResponse };
-    } catch (e) {
-      return { isValid: false };
-    }
+  // Legacy interface member. v2 webhooks are authenticated in routes/paymentsWebhook.ts
+  // (Authorization = SHA256(username:password)), so this salt-key path is unused.
+  async verifyWebhook(_payload: any, _signature: string, _env: Env) {
+    return { isValid: false as const };
   }
 }

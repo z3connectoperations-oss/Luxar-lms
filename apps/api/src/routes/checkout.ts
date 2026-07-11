@@ -112,7 +112,7 @@ checkout.post("/order", async (c) => {
   }
 
   // MOCK MODE FALLBACK FOR LOCAL TESTING
-  if (!c.env.PHONEPE_MERCHANT_ID) {
+  if (!c.env.PHONEPE_CLIENT_ID) {
     return c.json({ orderId: activeOrderId, amount: total, phonepeUrl: `/payment/result?transactionId=MOCK_${activeMerchantTransactionId}` });
   }
 
@@ -175,7 +175,7 @@ checkout.post("/product-order", async (c) => {
   }
 
   // MOCK MODE FALLBACK FOR LOCAL TESTING
-  if (!c.env.PHONEPE_MERCHANT_ID) {
+  if (!c.env.PHONEPE_CLIENT_ID) {
     return c.json({ orderId, amount: total, phonepeUrl: `/payment/result?transactionId=MOCK_${merchantTransactionId}` });
   }
 
@@ -183,7 +183,7 @@ checkout.post("/product-order", async (c) => {
 });
 
 // Fulfilment: mark paid + create enrollment(s) + notify.
-async function fulfill(db: Db, env: Env, userId: string, orderId: string) {
+export async function fulfill(db: Db, env: Env, userId: string, orderId: string) {
   await db.update(orders).set({ status: "paid" }).where(eq(orders.id, orderId));
   await db.update(payments).set({ status: "paid" }).where(eq(payments.orderId, orderId));
 
@@ -312,7 +312,7 @@ checkout.post("/course-order", async (c) => {
   }
 
   // MOCK MODE FALLBACK FOR LOCAL TESTING
-  if (!c.env.PHONEPE_MERCHANT_ID) {
+  if (!c.env.PHONEPE_CLIENT_ID) {
     return c.json({ orderId: activeOrderId, amount: total, phonepeUrl: `/payment/result?transactionId=MOCK_${activeMerchantTransactionId}` });
   }
 
@@ -390,7 +390,7 @@ checkout.post("/test-series-order", async (c) => {
   }
 
   // MOCK MODE FALLBACK
-  if (!c.env.PHONEPE_MERCHANT_ID) {
+  if (!c.env.PHONEPE_CLIENT_ID) {
     return c.json({ orderId: activeOrderId, amount: total, phonepeUrl: `/payment/result?transactionId=MOCK_${activeMerchantTransactionId}` });
   }
 
@@ -483,7 +483,7 @@ checkout.get("/status/:merchantTransactionId", async (c) => {
   const db = c.get("db");
   const paramId = c.req.param("merchantTransactionId");
   
-  const isMock = paramId.startsWith("MOCK_") && !c.env.PHONEPE_MERCHANT_ID;
+  const isMock = paramId.startsWith("MOCK_") && !c.env.PHONEPE_CLIENT_ID;
   const dbQueryId = isMock ? paramId.replace("MOCK_", "") : paramId;
   
   const order = await db.select().from(orders).where(eq(orders.merchantTransactionId, dbQueryId)).get();
