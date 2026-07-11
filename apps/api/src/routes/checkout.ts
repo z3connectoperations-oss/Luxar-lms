@@ -81,10 +81,10 @@ checkout.post("/order", async (c) => {
   
   if (existingPending && existingPending.orders.paymentProvider === "phonepe") {
     activeOrderId = existingPending.orders.id;
-    activeMerchantTransactionId = existingPending.orders.merchantTransactionId || merchantTransactionId;
-    if (!existingPending.orders.merchantTransactionId) {
-      await db.update(orders).set({ merchantTransactionId: activeMerchantTransactionId }).where(eq(orders.id, activeOrderId));
-    }
+    // Always send a FRESH merchantTransactionId to PhonePe — reusing a previously
+    // submitted merchantOrderId is rejected with INVALID_TRANSACTION_ID.
+    activeMerchantTransactionId = merchantTransactionId;
+    await db.update(orders).set({ merchantTransactionId: activeMerchantTransactionId, paymentStatus: "INITIATED" }).where(eq(orders.id, activeOrderId));
   } else {
     await db.insert(orders).values({ 
       id: orderId, userId: user.id, status: "created", 
@@ -281,10 +281,10 @@ checkout.post("/course-order", async (c) => {
 
   if (existingPending && existingPending.orders.paymentProvider === "phonepe") {
     activeOrderId = existingPending.orders.id;
-    activeMerchantTransactionId = existingPending.orders.merchantTransactionId || merchantTransactionId;
-    if (!existingPending.orders.merchantTransactionId) {
-      await db.update(orders).set({ merchantTransactionId: activeMerchantTransactionId }).where(eq(orders.id, activeOrderId));
-    }
+    // Always send a FRESH merchantTransactionId to PhonePe — reusing a previously
+    // submitted merchantOrderId is rejected with INVALID_TRANSACTION_ID.
+    activeMerchantTransactionId = merchantTransactionId;
+    await db.update(orders).set({ merchantTransactionId: activeMerchantTransactionId, paymentStatus: "INITIATED" }).where(eq(orders.id, activeOrderId));
   } else {
     await db.insert(orders).values({ 
       id: orderId, userId: user.id, status: "created", 
@@ -361,10 +361,10 @@ checkout.post("/test-series-order", async (c) => {
 
   if (existingPending && existingPending.orders.paymentProvider === "phonepe") {
     activeOrderId = existingPending.orders.id;
-    activeMerchantTransactionId = existingPending.orders.merchantTransactionId || merchantTransactionId;
-    if (!existingPending.orders.merchantTransactionId) {
-      await db.update(orders).set({ merchantTransactionId: activeMerchantTransactionId }).where(eq(orders.id, activeOrderId));
-    }
+    // Always send a FRESH merchantTransactionId to PhonePe — reusing a previously
+    // submitted merchantOrderId is rejected with INVALID_TRANSACTION_ID.
+    activeMerchantTransactionId = merchantTransactionId;
+    await db.update(orders).set({ merchantTransactionId: activeMerchantTransactionId, paymentStatus: "INITIATED" }).where(eq(orders.id, activeOrderId));
   } else {
     await db.insert(orders).values({ 
       id: orderId, userId: user.id, status: "created", 
