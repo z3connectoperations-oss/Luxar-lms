@@ -198,6 +198,7 @@ export async function fulfill(db: Db, env: Env, userId: string, orderId: string)
   await db.update(payments).set({ status: "paid" }).where(eq(payments.orderId, orderId));
 
   const items = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId)).all();
+  console.log(`[fulfill] order=${orderId} user=${userId} items=${items.map((i) => i.kind + ":" + (i.productId || i.courseVariantId)).join(",")}`);
   for (const item of items) {
     // Determine the course + validity window for this item.
     let courseId: string | null = null;
@@ -205,12 +206,12 @@ export async function fulfill(db: Db, env: Env, userId: string, orderId: string)
     let variantId: string | null = null;
     if (item.kind === "course" && item.courseVariantId) {
       const variant = await db.select().from(courseVariants).where(eq(courseVariants.id, item.courseVariantId)).get();
-      if (!variant) continue;
+      if (!variant) { console.warn(`[fulfill] variant not found: ${item.courseVariantId}`); continue; }
       courseId = variant.courseId; validityDays = variant.validityDays; variantId = variant.id;
     } else if (item.kind === "course-direct" && item.productId) {
       // course-direct stores the courseId in productId; validity = course.durationDays
       const course = await db.select().from(courses).where(eq(courses.id, item.productId)).get();
-      if (!course) continue;
+      if (!course) { console.warn(`[fulfill] course not found (deleted?): ${item.productId} — cannot enrol`); continue; }
       courseId = course.id; validityDays = course.durationDays ?? 365;
     } else if (item.kind === "test-series" && item.productId) {
       // Test Series fulfillment
@@ -233,11 +234,12 @@ export async function fulfill(db: Db, env: Env, userId: string, orderId: string)
 
     const already = await db.select().from(enrollments)
       .where(and(eq(enrollments.userId, userId), eq(enrollments.courseId, courseId))).get();
-    if (already) continue;
+    if (already) { console.log(`[fulfill] already enrolled in ${courseId}`); continue; }
     await db.insert(enrollments).values({
       id: crypto.randomUUID(), userId, courseId, variantId,
       expiryDate: new Date(Date.now() + validityDays * 86400000), progressPct: 0,
     });
+    console.log(`[fulfill] enrolled user=${userId} course=${courseId}`);
     await createNotification(db, env, {
       userId, type: "enrollment", title: "Enrollment confirmed",
       body: "You now have access to your course. Happy learning!", link: "/student",
@@ -281,9 +283,9 @@ function buildInvoiceHtml(d: { invoiceNumber: string; studentName: string; lineI
 async function maybeCreateInvoiceAndEmail(db: Db, env: Env, userId: string, orderId: string, items: any[]) {
   try {
     const order = await db.select().from(orders).where(eq(orders.id, orderId)).get();
-    if (!order || (order.total ?? 0) <= 0) return; // free enrolment — no invoice
+    if (!order || (order.total ?? 0) <= 0) { console.log(`[invoice] skip: free/no order (${orderId})`); return; }
     const existing = await db.select().from(invoices).where(eq(invoices.orderId, orderId)).get();
-    if (existing) return; // idempotent
+    if (existing) { console.log(`[invoice] skip: already exists (${orderId})`); return; }
 
     const buyer = await db.select({ email: users.email, name: users.name, phone: users.phone }).from(users).where(eq(users.id, userId)).get();
 
@@ -346,7 +348,10 @@ async function maybeCreateInvoiceAndEmail(db: Db, env: Env, userId: string, orde
     if (buyer?.email) {
       const html = buildInvoiceHtml({ invoiceNumber, studentName: buyer.name || "Student", lineItems, total, businessDetails });
       const attachments = pdfBytes ? [{ filename: `Invoice-${invoiceNumber}.pdf`, content: toBase64(pdfBytes) }] : undefined;
-      await sendEmail(env, buyer.email, `Your Luxaar Institute invoice ${invoiceNumber}`, { html, attachments }).catch(() => {});
+      await sendEmail(env, buyer.email, `Your Luxaar Institute invoice ${invoiceNumber}`, { html, attachments }).catch((e) => console.error("[invoice] email send failed:", e));
+      console.log(`[invoice] created ${invoiceNumber} (pdf=${!!pdfBytes}) emailed to ${buyer.email}`);
+    } else {
+      console.warn(`[invoice] created ${invoiceNumber} but buyer has no email`);
     }
   } catch (e) {
     console.error("[invoice] generation/email failed:", e instanceof Error ? e.message : String(e));
