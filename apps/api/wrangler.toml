@@ -1,6 +1,8 @@
 name = "luxar-api"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
+# Cloudflare account that owns this project (luxaarinstitute@gmail.com).
+account_id = "1f6017fad93779c91706814678fa120a"
 
 [vars]
 # Runtime configuration variables
