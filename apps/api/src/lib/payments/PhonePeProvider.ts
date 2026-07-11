@@ -58,12 +58,16 @@ export class PhonePeProvider implements PaymentProvider {
     try {
       const res = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
         body: form.toString(),
       });
-      const data = (await res.json()) as any;
+      // Read raw body first so failures can be logged (the error body carries no
+      // secret of ours; the access_token is only present on success and never logged).
+      const bodyText = await res.text();
+      let data: any = {};
+      try { data = JSON.parse(bodyText); } catch { /* non-JSON error body */ }
       if (!res.ok || !data?.access_token) {
-        console.error("PhonePe OAuth failed:", res.status);
+        console.error(`PhonePe OAuth failed: ${res.status} ${bodyText.slice(0, 400)}`);
         return null;
       }
       cachedToken = {
