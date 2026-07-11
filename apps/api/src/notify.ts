@@ -37,13 +37,21 @@ export async function createNotification(db: Db, env: Env, n: NotifyInput) {
   const user = await db.select({ email: users.email, name: users.name }).from(users).where(eq(users.id, n.userId)).get();
   if (!user?.email) return;
 
-  await sendEmail(env, user.email, n.title, `${n.body || ""}\n\n— Luxar LMS`).catch(() => {});
+  await sendEmail(env, user.email, n.title, { text: `${n.body || ""}\n\n— Luxaar Institute` }).catch(() => {});
 }
 
-async function sendEmail(env: Env, to: string, subject: string, text: string) {
+/** Send an email via Resend (HTTP API — works in Workers). Supports text and/or HTML. */
+export async function sendEmail(env: Env, to: string, subject: string, opts: { text?: string; html?: string }) {
+  if (!env.RESEND_API_KEY) return;
   await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: env.EMAIL_FROM || "Luxar LMS <onboarding@resend.dev>", to, subject, text }),
+    body: JSON.stringify({
+      from: env.EMAIL_FROM || "Luxaar Institute <onboarding@resend.dev>",
+      to,
+      subject,
+      ...(opts.html ? { html: opts.html } : {}),
+      ...(opts.text ? { text: opts.text } : {}),
+    }),
   });
 }

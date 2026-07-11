@@ -12,10 +12,11 @@ import {
   shippingAddresses,
   invoices,
   testSeries,
-  testSeriesEnrollments
+  testSeriesEnrollments,
+  users,
 } from "@luxar/db";
 import { requireAuth } from "../middleware";
-import { createNotification } from "../notify";
+import { createNotification, sendEmail } from "../notify";
 import type { AppEnv } from "../types";
 import type { Db } from "@luxar/db";
 
@@ -232,6 +233,78 @@ export async function fulfill(db: Db, env: Env, userId: string, orderId: string)
       userId, type: "enrollment", title: "Enrollment confirmed",
       body: "You now have access to your course. Happy learning!", link: "/student",
     });
+  }
+
+  // Generate + email the invoice for paid orders (idempotent — one per order).
+  await maybeCreateInvoiceAndEmail(db, env, userId, orderId, items);
+}
+
+// Money helper (paise → ₹).
+const money = (paise: number) => "₹" + (paise / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// Build a styled HTML invoice email.
+function buildInvoiceHtml(d: { invoiceNumber: string; studentName: string; lineItems: { title: string; amount: number }[]; total: number; businessDetails: string }) {
+  const date = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" });
+  const rows = d.lineItems
+    .map((li) => `<tr><td style="padding:10px 0;border-bottom:1px solid #eee;color:#111">${li.title}</td><td style="padding:10px 0;border-bottom:1px solid #eee;text-align:right;color:#111">${money(li.amount)}</td></tr>`)
+    .join("");
+  return `<!doctype html><html><body style="margin:0;background:#f5f5f5;font-family:Arial,Helvetica,sans-serif">
+  <div style="max-width:560px;margin:24px auto;background:#fff;border-radius:14px;overflow:hidden;border:1px solid #eaeaea">
+    <div style="background:#111;color:#fff;padding:22px 28px">
+      <div style="font-size:20px;font-weight:bold;letter-spacing:-.5px">Luxaar Institute</div>
+      <div style="font-size:12px;color:#c7a75b;margin-top:2px">Payment Receipt &amp; Invoice</div>
+    </div>
+    <div style="padding:24px 28px">
+      <p style="color:#333;font-size:14px;margin:0 0 8px">Hi ${d.studentName},</p>
+      <p style="color:#555;font-size:14px;line-height:1.6;margin:0 0 18px">Thank you for your purchase — your payment was received and your access is now active. Here is your invoice:</p>
+      <table style="width:100%;font-size:13px;color:#555;margin:0 0 8px"><tr><td>Invoice No.</td><td style="text-align:right;font-weight:bold;color:#111">${d.invoiceNumber}</td></tr><tr><td>Date</td><td style="text-align:right;color:#111">${date}</td></tr></table>
+      <table style="width:100%;font-size:14px;border-collapse:collapse;margin-top:8px">
+        <thead><tr><th style="text-align:left;padding-bottom:8px;color:#999;font-size:11px;text-transform:uppercase">Item</th><th style="text-align:right;padding-bottom:8px;color:#999;font-size:11px;text-transform:uppercase">Amount</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr><td style="padding-top:14px;font-weight:bold;color:#111">Total Paid</td><td style="padding-top:14px;text-align:right;font-weight:bold;font-size:16px;color:#111">${money(d.total)}</td></tr></tfoot>
+      </table>
+      <p style="color:#999;font-size:12px;margin-top:26px;line-height:1.6">${d.businessDetails}<br/>This is a system-generated invoice — no signature required.</p>
+    </div>
+  </div></body></html>`;
+}
+
+// Create the invoice row + email it (only for paid orders, only once).
+async function maybeCreateInvoiceAndEmail(db: Db, env: Env, userId: string, orderId: string, items: any[]) {
+  try {
+    const order = await db.select().from(orders).where(eq(orders.id, orderId)).get();
+    if (!order || (order.total ?? 0) <= 0) return; // free enrolment — no invoice
+    const existing = await db.select().from(invoices).where(eq(invoices.orderId, orderId)).get();
+    if (existing) return; // idempotent
+
+    const buyer = await db.select({ email: users.email, name: users.name }).from(users).where(eq(users.id, userId)).get();
+
+    const lineItems: { title: string; amount: number }[] = [];
+    for (const item of items) {
+      let title = "Item";
+      if (item.kind === "course" && item.courseVariantId) {
+        const v = await db.select().from(courseVariants).where(eq(courseVariants.id, item.courseVariantId)).get();
+        const co = v ? await db.select({ title: courses.title }).from(courses).where(eq(courses.id, v.courseId)).get() : null;
+        title = co?.title || "Course";
+      } else if (item.kind === "course-direct" && item.productId) {
+        title = (await db.select({ title: courses.title }).from(courses).where(eq(courses.id, item.productId)).get())?.title || "Course";
+      } else if (item.kind === "test-series" && item.productId) {
+        title = (await db.select({ title: testSeries.title }).from(testSeries).where(eq(testSeries.id, item.productId)).get())?.title || "Test Series";
+      } else if (item.kind === "product" && item.productId) {
+        title = (await db.select({ title: products.title }).from(products).where(eq(products.id, item.productId)).get())?.title || "Product";
+      }
+      lineItems.push({ title, amount: item.price ?? 0 });
+    }
+
+    const invoiceNumber = `INV-${new Date().getFullYear()}-${crypto.randomUUID().split("-")[0].toUpperCase()}`;
+    const businessDetails = "Luxaar Institute (A unit of SABI CONSTRUCTION)";
+    await db.insert(invoices).values({ id: crypto.randomUUID(), orderId, userId, invoiceNumber, amount: order.total ?? 0, businessDetails });
+
+    if (buyer?.email) {
+      const html = buildInvoiceHtml({ invoiceNumber, studentName: buyer.name || "Student", lineItems, total: order.total ?? 0, businessDetails });
+      await sendEmail(env, buyer.email, `Your Luxaar Institute invoice ${invoiceNumber}`, { html }).catch(() => {});
+    }
+  } catch (e) {
+    console.error("[invoice] generation/email failed:", e instanceof Error ? e.message : String(e));
   }
 }
 
