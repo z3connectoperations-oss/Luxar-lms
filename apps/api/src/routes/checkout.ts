@@ -17,6 +17,15 @@ import {
 } from "@luxar/db";
 import { requireAuth } from "../middleware";
 import { createNotification, sendEmail } from "../notify";
+import { buildInvoicePdf } from "../lib/invoice";
+
+// Base64-encode PDF bytes for a Resend email attachment.
+function toBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  return btoa(binary);
+}
 import type { AppEnv } from "../types";
 import type { Db } from "@luxar/db";
 
@@ -268,7 +277,7 @@ function buildInvoiceHtml(d: { invoiceNumber: string; studentName: string; lineI
   </div></body></html>`;
 }
 
-// Create the invoice row + email it (only for paid orders, only once).
+// Create the invoice row + PDF, store it in R2, and email it (paid orders, once).
 async function maybeCreateInvoiceAndEmail(db: Db, env: Env, userId: string, orderId: string, items: any[]) {
   try {
     const order = await db.select().from(orders).where(eq(orders.id, orderId)).get();
@@ -276,7 +285,7 @@ async function maybeCreateInvoiceAndEmail(db: Db, env: Env, userId: string, orde
     const existing = await db.select().from(invoices).where(eq(invoices.orderId, orderId)).get();
     if (existing) return; // idempotent
 
-    const buyer = await db.select({ email: users.email, name: users.name }).from(users).where(eq(users.id, userId)).get();
+    const buyer = await db.select({ email: users.email, name: users.name, phone: users.phone }).from(users).where(eq(users.id, userId)).get();
 
     const lineItems: { title: string; amount: number }[] = [];
     for (const item of items) {
@@ -297,11 +306,47 @@ async function maybeCreateInvoiceAndEmail(db: Db, env: Env, userId: string, orde
 
     const invoiceNumber = `INV-${new Date().getFullYear()}-${crypto.randomUUID().split("-")[0].toUpperCase()}`;
     const businessDetails = "Luxaar Institute (A unit of SABI CONSTRUCTION)";
-    await db.insert(invoices).values({ id: crypto.randomUUID(), orderId, userId, invoiceNumber, amount: order.total ?? 0, businessDetails });
+    const total = order.total ?? 0;
+    const paymentAt = order.paymentCompletedAt ? new Date(order.paymentCompletedAt) : new Date();
+    const fmtDate = (dt: Date) => dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+    const fmtDateTime = (dt: Date) => dt.toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+    // Generate the PDF invoice (best-effort — never block fulfilment on it).
+    let pdfBytes: Uint8Array | null = null;
+    try {
+      pdfBytes = await buildInvoicePdf({
+        invoiceNumber,
+        date: fmtDate(new Date()),
+        buyer: { name: buyer?.name || "Student", email: buyer?.email || "", phone: buyer?.phone },
+        transactionId: order.phonepeTransactionId || order.merchantTransactionId || orderId,
+        paymentMode: "Online (PhonePe)",
+        paymentDate: fmtDateTime(paymentAt),
+        lineItems,
+        total,
+      });
+    } catch (e) {
+      console.error("[invoice] pdf build failed:", e instanceof Error ? e.message : String(e));
+    }
+
+    // Store the PDF in R2 (so it can also be re-downloaded later).
+    const pdfKey = `invoices/${invoiceNumber}.pdf`;
+    if (pdfBytes) {
+      try {
+        await env.BUCKET.put(pdfKey, pdfBytes, { httpMetadata: { contentType: "application/pdf" } });
+      } catch (e) {
+        console.error("[invoice] r2 store failed:", e instanceof Error ? e.message : String(e));
+      }
+    }
+
+    await db.insert(invoices).values({
+      id: crypto.randomUUID(), orderId, userId, invoiceNumber, amount: total, businessDetails,
+      pdfR2Key: pdfBytes ? pdfKey : null,
+    });
 
     if (buyer?.email) {
-      const html = buildInvoiceHtml({ invoiceNumber, studentName: buyer.name || "Student", lineItems, total: order.total ?? 0, businessDetails });
-      await sendEmail(env, buyer.email, `Your Luxaar Institute invoice ${invoiceNumber}`, { html }).catch(() => {});
+      const html = buildInvoiceHtml({ invoiceNumber, studentName: buyer.name || "Student", lineItems, total, businessDetails });
+      const attachments = pdfBytes ? [{ filename: `Invoice-${invoiceNumber}.pdf`, content: toBase64(pdfBytes) }] : undefined;
+      await sendEmail(env, buyer.email, `Your Luxaar Institute invoice ${invoiceNumber}`, { html, attachments }).catch(() => {});
     }
   } catch (e) {
     console.error("[invoice] generation/email failed:", e instanceof Error ? e.message : String(e));

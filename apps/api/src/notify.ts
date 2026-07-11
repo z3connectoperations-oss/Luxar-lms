@@ -40,8 +40,13 @@ export async function createNotification(db: Db, env: Env, n: NotifyInput) {
   await sendEmail(env, user.email, n.title, { text: `${n.body || ""}\n\n— Luxaar Institute` }).catch(() => {});
 }
 
-/** Send an email via Resend (HTTP API — works in Workers). Supports text and/or HTML. */
-export async function sendEmail(env: Env, to: string, subject: string, opts: { text?: string; html?: string }) {
+/** Send an email via Resend (HTTP API — works in Workers). Supports text/HTML + attachments. */
+export async function sendEmail(
+  env: Env,
+  to: string,
+  subject: string,
+  opts: { text?: string; html?: string; attachments?: { filename: string; content: string }[] }
+) {
   if (!env.RESEND_API_KEY) return;
   await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -52,6 +57,7 @@ export async function sendEmail(env: Env, to: string, subject: string, opts: { t
       subject,
       ...(opts.html ? { html: opts.html } : {}),
       ...(opts.text ? { text: opts.text } : {}),
+      ...(opts.attachments ? { attachments: opts.attachments } : {}),
     }),
   });
 }
