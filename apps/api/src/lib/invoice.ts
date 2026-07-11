@@ -1,4 +1,5 @@
-import { PDFDocument, StandardFonts, rgb, type PDFPage, type PDFFont } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
+import { LOGO_PNG_BASE64 } from "./logo";
 
 export interface InvoiceData {
   invoiceNumber: string;
@@ -47,12 +48,23 @@ export async function buildInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
   const hline = (yTop: number) => page.drawLine({ start: { x: L, y: H - yTop }, end: { x: R, y: H - yTop }, thickness: 1, color: LINE });
   const label = (t: string, x: number, yTop: number) => text(t.toUpperCase(), x, yTop, 7.5, bold, MUTED);
 
-  // Header
-  text(SELLER.name, L, 60, 20, bold);
-  text(SELLER.sub, L, 76, 9, font, MUTED);
-  rightText("INVOICE", 58, 18, bold);
-  rightText("Payment Receipt", 74, 9, font, GOLD);
-  hline(96);
+  // Header band (dark) with the embedded logo — the logo art is on a dark
+  // background, so a dark band lets it sit seamlessly like a letterhead.
+  const bandH = 96;
+  page.drawRectangle({ x: 0, y: H - bandH, width: page.getWidth(), height: bandH, color: INK });
+  try {
+    const logoBytes = Uint8Array.from(atob(LOGO_PNG_BASE64), (ch) => ch.charCodeAt(0));
+    const logo = await doc.embedPng(logoBytes);
+    const logoH = 62;
+    const logoW = (logo.width / logo.height) * logoH;
+    page.drawImage(logo, { x: L, y: H - bandH + (bandH - logoH) / 2, width: logoW, height: logoH });
+  } catch {
+    // Fallback to text if the image can't embed.
+    page.drawText(SELLER.name, { x: L, y: H - 56, size: 20, font: bold, color: rgb(1, 1, 1) });
+  }
+  const white = rgb(1, 1, 1);
+  page.drawText("INVOICE", { x: R - bold.widthOfTextAtSize("INVOICE", 18), y: H - 46, size: 18, font: bold, color: white });
+  page.drawText("Payment Receipt", { x: R - font.widthOfTextAtSize("Payment Receipt", 9), y: H - 62, size: 9, font, color: GOLD });
 
   // From (seller)
   let y = 122;
