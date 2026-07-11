@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { users, auditLog, notificationPrefs } from "@luxar/db";
 import { sessionRequestSchema, type MeUser, type Role } from "@luxar/shared";
 import { verifyFirebaseToken } from "./firebase";
@@ -104,10 +104,17 @@ app.post("/auth/session", async (c) => {
   const db = c.get("db");
   let user = await db.select().from(users).where(eq(users.firebaseUid, claims.uid)).get();
 
-  // Link an admin-invited account (created with a placeholder firebaseUid) by email,
-  // keeping its assigned role (admin/trainer).
+  // Link an existing account by email (case-insensitive) — e.g. an admin-invited
+  // account with a placeholder firebaseUid, OR the same person signing in with a
+  // different provider (Google vs email/password) which yields a different
+  // firebaseUid. Re-link the uid instead of inserting a duplicate email (which
+  // would violate the unique constraint and 500 the login).
   if (!user) {
-    const invited = await db.select().from(users).where(eq(users.email, claims.email.toLowerCase())).get();
+    const invited = await db
+      .select()
+      .from(users)
+      .where(sql`lower(${users.email}) = ${claims.email.toLowerCase()}`)
+      .get();
     if (invited) {
       await db.update(users)
         .set({ firebaseUid: claims.uid, name: invited.name || claims.name || claims.email.split("@")[0] })
@@ -125,7 +132,7 @@ app.post("/auth/session", async (c) => {
     await db.insert(users).values({
       id,
       firebaseUid: claims.uid,
-      email: claims.email,
+      email: claims.email.toLowerCase(),
       name: claims.name ?? claims.email.split("@")[0],
       role,
     });
