@@ -47,8 +47,11 @@ export async function sendEmail(
   subject: string,
   opts: { text?: string; html?: string; attachments?: { filename: string; content: string }[] }
 ) {
-  if (!env.RESEND_API_KEY) return;
-  await fetch("https://api.resend.com/emails", {
+  if (!env.RESEND_API_KEY) {
+    console.warn("[email] RESEND_API_KEY not set — email skipped");
+    return;
+  }
+  const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -60,4 +63,9 @@ export async function sendEmail(
       ...(opts.attachments ? { attachments: opts.attachments } : {}),
     }),
   });
+  if (!res.ok) {
+    // Resend's error explains delivery failures (unverified domain, test-mode
+    // recipient restriction, etc.). Body has no secret of ours.
+    console.error(`[email] Resend rejected (${res.status}) to=${to}: ${(await res.text()).slice(0, 300)}`);
+  }
 }
