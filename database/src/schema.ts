@@ -752,3 +752,19 @@ export const testSeriesAttemptAnswers = sqliteTable("test_series_attempt_answers
   selectedOption: text("selected_option"), // A | B | C | D | null
   isCorrect: bool("is_correct"),
 });
+
+// ===========================================================================
+// PAYMENT WEBHOOKS (idempotency ledger)
+// ===========================================================================
+// One row per unique webhook delivery. `dedupKey` is UNIQUE so duplicate
+// deliveries from PhonePe cannot be processed twice. Stores only non-sensitive
+// identifiers — never credentials, tokens, or full payment instrument details.
+export const phonepeWebhookEvents = sqliteTable("phonepe_webhook_events", {
+  id: id(),
+  dedupKey: text("dedup_key").notNull().unique(),
+  event: text("event"),
+  orderId: text("order_id"),
+  merchantOrderId: text("merchant_order_id"),
+  state: text("state"),
+  receivedAt: ts("received_at").$defaultFn(() => new Date()),
+});

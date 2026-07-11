@@ -15,6 +15,7 @@ import trainerRouter from "./routes/trainer";
 import liveRouter from "./routes/live";
 import { publicTestSeries, studentTestSeries } from "./routes/testSeries";
 import adminTestSeries from "./routes/adminTestSeries";
+import paymentsWebhook from "./routes/paymentsWebhook";
 import { handleScheduled } from "./scheduled";
 import type { AppEnv } from "./types";
 
@@ -162,6 +163,9 @@ app.get("/auth/me", requireAuth, (c) => c.json({ user: toMe(c.get("user")!) }));
 // Public website API (no auth).
 app.route("/site", siteRouter);
 app.route("/site/test-series", publicTestSeries);
+
+// Payment gateway webhooks (public; server-to-server, authenticated per-provider).
+app.route("/api/payments", paymentsWebhook);
 
 // Authenticated student/checkout APIs.
 app.route("/checkout", checkoutRouter);

@@ -24,6 +24,10 @@ export interface AppEnv {
     PHONEPE_SALT_INDEX?: string;
     PHONEPE_REDIRECT_URL?: string;
     PHONEPE_CALLBACK_URL?: string;
+    // PhonePe webhook credentials (configured in the PhonePe Business Dashboard).
+    // Set via `wrangler secret put` — never commit real values.
+    PHONEPE_WEBHOOK_USERNAME?: string;
+    PHONEPE_WEBHOOK_PASSWORD?: string;
   };
   Variables: {
     db: Db;
