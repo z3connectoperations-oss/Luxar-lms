@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, desc, and, or, inArray, sql } from "drizzle-orm";
+import { eq, desc, and, or, inArray, sql, isNull } from "drizzle-orm";
 import {
   exams,
   courses,
@@ -252,7 +252,9 @@ admin.get("/trainers", async (c) => {
 // ---- Courses --------------------------------------------------------------
 admin.get("/courses", async (c) => {
   const db = c.get("db");
-  const list = await db.select().from(courses).orderBy(desc(courses.createdAt)).all();
+  // Only top-level courses (packages + standalone). Sub-courses live inside their
+  // package's "Sub-courses" tab, never as separate cards in this list.
+  const list = await db.select().from(courses).where(isNull(courses.parentCourseId)).orderBy(desc(courses.createdAt)).all();
   const cats = await db.select().from(categories).all();
   const catName = (id: string | null) => cats.find((x) => x.id === id)?.name ?? null;
   return c.json({ courses: list.map((co) => ({ ...co, categoryName: catName(co.categoryId) })) });
