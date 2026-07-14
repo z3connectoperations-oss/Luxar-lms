@@ -263,9 +263,10 @@ admin.get("/courses", async (c) => {
 admin.get("/courses/:id", async (c) => {
   const db = c.get("db");
   const id = c.req.param("id");
-  const course = await db.select().from(courses).where(eq(courses.id, id)).get();
-  if (!course) return c.json({ error: "not found" }, 404);
-  const [variants, mods, mats, children] = await Promise.all([
+  // None of these depend on the course row (all keyed by the URL param), so fire
+  // them in one parallel batch — one round-trip instead of two.
+  const [course, variants, mods, mats, children] = await Promise.all([
+    db.select().from(courses).where(eq(courses.id, id)).get(),
     db.select().from(courseVariants).where(eq(courseVariants.courseId, id)).all(),
     db.select().from(modules).where(eq(modules.courseId, id)).orderBy(modules.position).all(),
     db.select().from(materials).where(eq(materials.courseId, id)).all(),
@@ -273,9 +274,11 @@ admin.get("/courses/:id", async (c) => {
     db.select({ id: courses.id, title: courses.title, slug: courses.slug, status: courses.status, thumbnailR2Key: courses.thumbnailR2Key, position: courses.position })
       .from(courses).where(eq(courses.parentCourseId, id)).orderBy(courses.position).all(),
   ]);
+  if (!course) return c.json({ error: "not found" }, 404);
   const moduleIds = mods.map((m) => m.id);
+  // Only this course's lessons — never scan the whole lessons table.
   const allLessons = moduleIds.length
-    ? await db.select().from(lessons).orderBy(lessons.position).all()
+    ? await db.select().from(lessons).where(inArray(lessons.moduleId, moduleIds)).orderBy(lessons.position).all()
     : [];
   const lessonsByModule = (mid: string) => allLessons.filter((l) => l.moduleId === mid);
   return c.json({

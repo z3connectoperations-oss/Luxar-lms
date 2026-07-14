@@ -29,6 +29,14 @@ const TABS = [
   { id: "mock_tests", label: "Mock Tests" },
 ] as const;
 
+// Categories & trainers rarely change — fetch them once per session and reuse the
+// promise, so opening course after course (e.g. a package's sub-courses) doesn't
+// refetch this reference data every time.
+let catsPromise: Promise<{ categories: { id: string; name: string }[] }> | null = null;
+let trainersPromise: Promise<{ trainers: { id: string; name: string }[] }> | null = null;
+const loadCats = () => (catsPromise ??= api<{ categories: { id: string; name: string }[] }>("/admin/categories"));
+const loadTrainers = () => (trainersPromise ??= api<{ trainers: { id: string; name: string }[] }>("/admin/trainers"));
+
 export default function CourseEdit() {
   const { id } = useParams();
   const [data, setData] = useState<CourseData | null>(null);
@@ -47,8 +55,8 @@ export default function CourseEdit() {
   }, [id]);
   useEffect(load, [load]);
   useEffect(() => {
-    api<{ categories: { id: string; name: string }[] }>("/admin/categories").then((d) => setCats(d.categories)).catch(() => {});
-    api<{ trainers: { id: string; name: string }[] }>("/admin/trainers").then((d) => setTrainers(d.trainers)).catch(() => {});
+    loadCats().then((d) => setCats(d.categories)).catch(() => {});
+    loadTrainers().then((d) => setTrainers(d.trainers)).catch(() => {});
   }, []);
 
   if (!data) return <div className="text-muted">Loading…</div>;
