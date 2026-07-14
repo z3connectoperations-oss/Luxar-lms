@@ -13,6 +13,7 @@ import {
   invoices,
   testSeries,
   testSeriesEnrollments,
+  packageTestSeries,
   users,
 } from "@luxar/db";
 import { requireAuth } from "../middleware";
@@ -209,6 +210,22 @@ async function enrollCourse(db: Db, env: Env, userId: string, courseId: string, 
   });
 }
 
+// Idempotent test-series enrolment (used for direct purchases and package bundles).
+async function enrollTestSeries(db: Db, env: Env, userId: string, testSeriesId: string, validityDays: number) {
+  const already = await db.select().from(testSeriesEnrollments)
+    .where(and(eq(testSeriesEnrollments.userId, userId), eq(testSeriesEnrollments.testSeriesId, testSeriesId))).get();
+  if (already) { console.log(`[fulfill] already enrolled in test series ${testSeriesId}`); return; }
+  await db.insert(testSeriesEnrollments).values({
+    id: crypto.randomUUID(), userId, testSeriesId,
+    expiryDate: new Date(Date.now() + validityDays * 86400000),
+  });
+  console.log(`[fulfill] enrolled user=${userId} test-series=${testSeriesId}`);
+  await createNotification(db, env, {
+    userId, type: "enrollment", title: "Test Series Enrollment confirmed",
+    body: "You now have access to your test series. Good luck!", link: "/student/test-series",
+  });
+}
+
 // Fulfilment: mark paid + create enrollment(s) + notify.
 export async function fulfill(db: Db, env: Env, userId: string, orderId: string) {
   await db.update(orders).set({ status: "paid" }).where(eq(orders.id, orderId));
@@ -230,10 +247,15 @@ export async function fulfill(db: Db, env: Env, userId: string, orderId: string)
       const course = await db.select().from(courses).where(eq(courses.id, item.productId)).get();
       if (!course) { console.warn(`[fulfill] course not found (deleted?): ${item.productId} — cannot enrol`); continue; }
       if (course.isPackage) {
-        // Package → flat: enrol the student in every sub-course.
+        // Package → flat: enrol the student in every sub-course AND every bundled
+        // test series, all for the package's own validity window.
+        const pkgValidity = course.durationDays ?? 365;
         const children = await db.select().from(courses).where(eq(courses.parentCourseId, course.id)).all();
-        console.log(`[fulfill] package ${course.id} -> ${children.length} sub-course(s)`);
-        for (const child of children) await enrollCourse(db, env, userId, child.id, child.durationDays ?? 365, null);
+        const bundledTs = await db.select({ testSeriesId: packageTestSeries.testSeriesId })
+          .from(packageTestSeries).where(eq(packageTestSeries.courseId, course.id)).all();
+        console.log(`[fulfill] package ${course.id} -> ${children.length} sub-course(s), ${bundledTs.length} test series`);
+        for (const child of children) await enrollCourse(db, env, userId, child.id, pkgValidity, null);
+        for (const t of bundledTs) await enrollTestSeries(db, env, userId, t.testSeriesId, pkgValidity);
         continue;
       }
       courseId = course.id; validityDays = course.durationDays ?? 365;
@@ -241,18 +263,7 @@ export async function fulfill(db: Db, env: Env, userId: string, orderId: string)
       // Test Series fulfillment
       const ts = await db.select().from(testSeries).where(eq(testSeries.id, item.productId)).get();
       if (!ts) continue;
-      const alreadyTs = await db.select().from(testSeriesEnrollments)
-        .where(and(eq(testSeriesEnrollments.userId, userId), eq(testSeriesEnrollments.testSeriesId, ts.id))).get();
-      if (!alreadyTs) {
-        await db.insert(testSeriesEnrollments).values({
-          id: crypto.randomUUID(), userId, testSeriesId: ts.id,
-          expiryDate: new Date(Date.now() + ts.validityDays * 86400000)
-        });
-        await createNotification(db, env, {
-          userId, type: "enrollment", title: "Test Series Enrollment confirmed",
-          body: "You now have access to your test series. Good luck!", link: "/student/test-series",
-        });
-      }
+      await enrollTestSeries(db, env, userId, ts.id, ts.validityDays);
       continue;
     } else continue;
 

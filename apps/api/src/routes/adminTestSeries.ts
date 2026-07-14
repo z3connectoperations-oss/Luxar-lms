@@ -68,6 +68,7 @@ adminTestSeries.delete("/:id", async (c) => {
   await db.run(sql`DELETE FROM test_series_questions WHERE test_id IN (SELECT id FROM test_series_tests WHERE test_series_id = ${id})`);
   await db.run(sql`DELETE FROM test_series_tests WHERE test_series_id = ${id}`);
   await db.run(sql`DELETE FROM test_series_enrollments WHERE test_series_id = ${id}`);
+  await db.run(sql`DELETE FROM package_test_series WHERE test_series_id = ${id}`);
   await db.delete(testSeries).where(eq(testSeries.id, id));
   return c.json({ ok: true });
 });

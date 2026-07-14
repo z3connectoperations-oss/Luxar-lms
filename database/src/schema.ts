@@ -725,6 +725,18 @@ export const testSeriesEnrollments = sqliteTable("test_series_enrollments", {
   expiryDate: ts("expiry_date"),
 });
 
+// Test series bundled into a package course (many-to-many). Buying the package
+// grants access to each linked test series for the package's validity window.
+export const packageTestSeries = sqliteTable("package_test_series", {
+  id: id(),
+  courseId: text("course_id")
+    .notNull()
+    .references(() => courses.id),
+  testSeriesId: text("test_series_id")
+    .notNull()
+    .references(() => testSeries.id),
+});
+
 export const testSeriesAttempts = sqliteTable("test_series_attempts", {
   id: id(),
   userId: text("user_id")

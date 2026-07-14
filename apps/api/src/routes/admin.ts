@@ -29,6 +29,7 @@ import {
   testSeriesTests,
   testSeriesQuestions,
   testSeriesAttempts,
+  packageTestSeries,
   lessonProgress,
   certificates,
   interviewSessions,
@@ -265,7 +266,7 @@ admin.get("/courses/:id", async (c) => {
   const id = c.req.param("id");
   // None of these depend on the course row (all keyed by the URL param), so fire
   // them in one parallel batch — one round-trip instead of two.
-  const [course, variants, mods, mats, children] = await Promise.all([
+  const [course, variants, mods, mats, children, pkgTs] = await Promise.all([
     db.select().from(courses).where(eq(courses.id, id)).get(),
     db.select().from(courseVariants).where(eq(courseVariants.courseId, id)).all(),
     db.select().from(modules).where(eq(modules.courseId, id)).orderBy(modules.position).all(),
@@ -273,6 +274,11 @@ admin.get("/courses/:id", async (c) => {
     // Sub-courses (for a package). Empty for a normal course.
     db.select({ id: courses.id, title: courses.title, slug: courses.slug, status: courses.status, thumbnailR2Key: courses.thumbnailR2Key, position: courses.position })
       .from(courses).where(eq(courses.parentCourseId, id)).orderBy(courses.position).all(),
+    // Test series bundled into this package (for a package). Empty otherwise.
+    db.select({ linkId: packageTestSeries.id, id: testSeries.id, title: testSeries.title, slug: testSeries.slug, status: testSeries.status })
+      .from(packageTestSeries)
+      .innerJoin(testSeries, eq(packageTestSeries.testSeriesId, testSeries.id))
+      .where(eq(packageTestSeries.courseId, id)).all(),
   ]);
   if (!course) return c.json({ error: "not found" }, 404);
   const moduleIds = mods.map((m) => m.id);
@@ -287,7 +293,34 @@ admin.get("/courses/:id", async (c) => {
     materials: mats,
     modules: mods.map((m) => ({ ...m, lessons: lessonsByModule(m.id) })),
     children,
+    packagedTestSeries: pkgTs,
   });
+});
+
+// Attach an existing test series to a package course.
+admin.post("/courses/:id/test-series", async (c) => {
+  const db = c.get("db");
+  const courseId = c.req.param("id");
+  const b = await c.req.json().catch(() => null);
+  if (!b?.testSeriesId) return c.json({ error: "testSeriesId required" }, 400);
+  const existing = await db.select().from(packageTestSeries)
+    .where(and(eq(packageTestSeries.courseId, courseId), eq(packageTestSeries.testSeriesId, b.testSeriesId))).get();
+  if (existing) return c.json({ id: existing.id });
+  const id = crypto.randomUUID();
+  await db.insert(packageTestSeries).values({ id, courseId, testSeriesId: b.testSeriesId });
+  await audit(c, "course.testseries.attach", "courses", courseId);
+  return c.json({ id });
+});
+
+// Detach a test series from a package course.
+admin.delete("/courses/:id/test-series/:tsId", async (c) => {
+  const db = c.get("db");
+  const courseId = c.req.param("id");
+  const tsId = c.req.param("tsId");
+  await db.delete(packageTestSeries)
+    .where(and(eq(packageTestSeries.courseId, courseId), eq(packageTestSeries.testSeriesId, tsId)));
+  await audit(c, "course.testseries.detach", "courses", courseId);
+  return c.json({ ok: true });
 });
 
 admin.post("/courses", async (c) => {
@@ -362,6 +395,7 @@ admin.delete("/courses/:id", async (c) => {
   await db.run(sql`DELETE FROM course_variants WHERE course_id = ${id}`);
   await db.run(sql`DELETE FROM course_trainers WHERE course_id = ${id}`);
   await db.run(sql`DELETE FROM coupons WHERE course_id = ${id}`);
+  await db.run(sql`DELETE FROM package_test_series WHERE course_id = ${id}`);
   await db.delete(courses).where(eq(courses.id, id));
   await audit(c, "course.delete", "courses", id);
   return c.json({ ok: true });

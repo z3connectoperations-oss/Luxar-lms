@@ -14,6 +14,8 @@ import {
   users,
   currentAffairsPosts,
   products,
+  testSeries,
+  packageTestSeries,
 } from "@luxar/db";
 import type { AppEnv } from "../types";
 
@@ -87,10 +89,17 @@ site.get("/courses/:slug", async (c) => {
     };
   });
 
-  // For a package, list the bundled sub-courses ("This package includes…").
+  // For a package, list the bundled sub-courses + test series ("This package includes…").
   const subCourses = course.isPackage
     ? await db.select({ id: courses.id, title: courses.title, summary: courses.summary, thumbnailR2Key: courses.thumbnailR2Key })
         .from(courses).where(eq(courses.parentCourseId, course.id)).orderBy(asc(courses.position)).all()
+    : [];
+  const includedTestSeries = course.isPackage
+    ? await db.select({ id: testSeries.id, title: testSeries.title, slug: testSeries.slug, thumbnailR2Key: testSeries.thumbnailR2Key })
+        .from(packageTestSeries)
+        .innerJoin(testSeries, eq(packageTestSeries.testSeriesId, testSeries.id))
+        .where(and(eq(packageTestSeries.courseId, course.id), eq(testSeries.status, "published")))
+        .all()
     : [];
 
   return c.json({
@@ -107,6 +116,7 @@ site.get("/courses/:slug", async (c) => {
     variants,
     curriculum,
     subCourses,
+    includedTestSeries,
   });
 });
 
