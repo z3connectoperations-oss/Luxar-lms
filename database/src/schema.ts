@@ -76,6 +76,7 @@ export const courses = sqliteTable("courses", {
   // Package/bundle support: a package course bundles several sub-courses.
   isPackage: bool("is_package").default(false), // true = this course is a package
   parentCourseId: text("parent_course_id"), // set on a sub-course → its package (self-ref, no FK)
+  includesTestSeries: bool("includes_test_series").default(false), // package bundles test series too
   title: text("title").notNull(),
   slug: text("slug").notNull().unique(),
   summary: text("summary"),

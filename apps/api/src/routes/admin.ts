@@ -369,6 +369,7 @@ admin.post("/courses", async (c) => {
     minProgressPct: b.minProgressPct ?? 100,
     isPackage: b.isPackage ?? false,
     parentCourseId: b.parentCourseId || null,
+    includesTestSeries: b.includesTestSeries ?? false,
   });
   await audit(c, "course.create", "courses", id);
   return c.json({ id });
