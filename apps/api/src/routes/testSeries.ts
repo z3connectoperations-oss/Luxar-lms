@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, desc, and, sql, inArray } from "drizzle-orm";
+import { eq, desc, and, sql, inArray, notInArray } from "drizzle-orm";
 import {
   testSeries,
   testSeriesTests,
@@ -7,6 +7,7 @@ import {
   testSeriesEnrollments,
   testSeriesAttempts,
   testSeriesAttemptAnswers,
+  packageTestSeries,
 } from "@luxar/db";
 import { requireAuth } from "../middleware";
 import type { AppEnv } from "../types";
@@ -22,10 +23,17 @@ studentTestSeries.use("*", requireAuth);
 // question count / duration / marks summed across its published child tests.
 publicTestSeries.get("/", async (c) => {
   const db = c.get("db");
+  // Package-owned test series are sold only inside their package — keep them out
+  // of the standalone catalogue.
+  const bundled = await db.select({ id: packageTestSeries.testSeriesId }).from(packageTestSeries).all();
+  const bundledIds = bundled.map((b) => b.id);
   const list = await db
     .select()
     .from(testSeries)
-    .where(inArray(testSeries.status, ["published", "coming_soon"]))
+    .where(and(
+      inArray(testSeries.status, ["published", "coming_soon"]),
+      bundledIds.length ? notInArray(testSeries.id, bundledIds) : undefined,
+    ))
     .orderBy(testSeries.position)
     .all();
 

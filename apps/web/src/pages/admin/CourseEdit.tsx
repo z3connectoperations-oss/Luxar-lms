@@ -244,32 +244,25 @@ export default function CourseEdit() {
   );
 }
 
-// Test series bundled into a package. Admin attaches existing (already-created)
-// test series; buying the package grants access to each of them.
+// Test series bundled into a package. Each package gets its OWN test series
+// (created here, like sub-courses) — not shared from a global pool. Buying the
+// package grants access to each of them.
 function PackageTestSeries({ packageId, attached, reload }: { packageId: string; attached: PackagedTS[]; reload: () => void }) {
-  const [all, setAll] = useState<PackagedTS[]>([]);
-  const [pick, setPick] = useState("");
+  const [title, setTitle] = useState("");
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    api<{ testSeries: PackagedTS[] }>("/admin/test-series").then((d) => setAll(d.testSeries)).catch(() => {});
-  }, []);
-
-  const attachedIds = new Set(attached.map((t) => t.id));
-  const available = all.filter((t) => !attachedIds.has(t.id));
-
   const add = async () => {
-    if (!pick) return;
+    if (!title.trim()) return;
     setBusy(true);
     try {
-      await api(`/admin/courses/${packageId}/test-series`, { method: "POST", body: JSON.stringify({ testSeriesId: pick }) });
-      setPick("");
+      await api(`/admin/courses/${packageId}/test-series`, { method: "POST", body: JSON.stringify({ title: title.trim() }) });
+      setTitle("");
       reload();
     } finally { setBusy(false); }
   };
 
   const remove = async (t: PackagedTS) => {
-    if (!window.confirm(`Remove "${t.title}" from this package?\n\nThe test series itself is not deleted — it's just no longer bundled.`)) return;
+    if (!window.confirm(`Remove "${t.title}" from this package?\n\nThis un-bundles the test series (the series and its tests remain under Test Series).`)) return;
     await api(`/admin/courses/${packageId}/test-series/${t.id}`, { method: "DELETE" });
     reload();
   };
@@ -279,7 +272,7 @@ function PackageTestSeries({ packageId, attached, reload }: { packageId: string;
       <div className="flex items-baseline justify-between gap-2">
         <div>
           <h2 className="font-semibold text-ink">Test series in this package</h2>
-          <p className="text-xs text-muted">Buying this package also unlocks every test series below (for the package's validity).</p>
+          <p className="text-xs text-muted">Create test series just for this package. Buying the package unlocks all of them. Open one to add its tests & questions.</p>
         </div>
         <span className="text-xs text-muted">{attached.length} series</span>
       </div>
@@ -293,7 +286,7 @@ function PackageTestSeries({ packageId, attached, reload }: { packageId: string;
                 <div className="truncate text-xs text-muted">/{t.slug} · {t.status}</div>
               </div>
               <div className="flex shrink-0 items-center gap-3">
-                <Link to={`/admin/test-series/${t.id}`}><Button size="sm" variant="outline">Manage</Button></Link>
+                <Link to={`/admin/test-series/${t.id}/tests`}><Button size="sm" variant="outline">Manage</Button></Link>
                 <button className="text-xs font-semibold text-accent-pink hover:underline" onClick={() => remove(t)}>Remove</button>
               </div>
             </div>
@@ -302,14 +295,9 @@ function PackageTestSeries({ packageId, attached, reload }: { packageId: string;
       )}
 
       <div className="flex gap-2 rounded-lg border border-dashed border-border p-3">
-        <Select value={pick} onChange={(e) => setPick(e.target.value)}>
-          <option value="">— select a test series to add —</option>
-          {available.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
-        </Select>
-        <Button variant="outline" onClick={add} disabled={busy || !pick}>{busy ? "Adding…" : "+ Add test series"}</Button>
+        <Input placeholder="New test series title (e.g. TNPSC Group 1 Mock Tests)" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} />
+        <Button variant="outline" onClick={add} disabled={busy || !title.trim()}>{busy ? "Adding…" : "+ Add test series"}</Button>
       </div>
-      {available.length === 0 && all.length > 0 && <p className="text-xs text-muted">All existing test series are already in this package.</p>}
-      {all.length === 0 && <p className="text-xs text-muted">No test series exist yet. Create one under <Link to="/admin/test-series" className="font-semibold text-brand-600">Test Series</Link> first.</p>}
     </Card>
   );
 }

@@ -1,11 +1,12 @@
 import { Hono } from "hono";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, notInArray } from "drizzle-orm";
 import {
   testSeries,
   testSeriesTests,
   testSeriesQuestions,
   testSeriesEnrollments,
   testSeriesAttempts,
+  packageTestSeries,
   users
 } from "@luxar/db";
 import { requireRole } from "../middleware";
@@ -19,7 +20,13 @@ adminTestSeries.use("*", requireRole("admin"));
 
 // ---- Test Series CRUD ----------------------------------------------------
 adminTestSeries.get("/", async (c) => {
-  const list = await c.get("db").select().from(testSeries).orderBy(desc(testSeries.createdAt)).all();
+  const db = c.get("db");
+  // Package-owned test series are managed inside their package, not here.
+  const bundled = await db.select({ id: packageTestSeries.testSeriesId }).from(packageTestSeries).all();
+  const bundledIds = bundled.map((b) => b.id);
+  const list = await db.select().from(testSeries)
+    .where(bundledIds.length ? notInArray(testSeries.id, bundledIds) : undefined)
+    .orderBy(desc(testSeries.createdAt)).all();
   return c.json({ testSeries: list });
 });
 

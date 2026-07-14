@@ -297,19 +297,34 @@ admin.get("/courses/:id", async (c) => {
   });
 });
 
-// Attach an existing test series to a package course.
+// Add a test series to a package. Pass { title } to create a new package-owned
+// test series, or { testSeriesId } to link an existing one. New series are
+// created "published" but stay out of the standalone catalogue (they're filtered
+// out wherever a test series is bundled into a package).
 admin.post("/courses/:id/test-series", async (c) => {
   const db = c.get("db");
   const courseId = c.req.param("id");
   const b = await c.req.json().catch(() => null);
-  if (!b?.testSeriesId) return c.json({ error: "testSeriesId required" }, 400);
+  let testSeriesId: string | undefined = b?.testSeriesId;
+  if (!testSeriesId && b?.title) {
+    testSeriesId = crypto.randomUUID();
+    await db.insert(testSeries).values({
+      id: testSeriesId,
+      title: b.title,
+      slug: `${slugify(b.title)}-${testSeriesId.slice(0, 6)}`,
+      status: "published",
+      price: 0,
+      validityDays: 365,
+    });
+  }
+  if (!testSeriesId) return c.json({ error: "title or testSeriesId required" }, 400);
   const existing = await db.select().from(packageTestSeries)
-    .where(and(eq(packageTestSeries.courseId, courseId), eq(packageTestSeries.testSeriesId, b.testSeriesId))).get();
-  if (existing) return c.json({ id: existing.id });
+    .where(and(eq(packageTestSeries.courseId, courseId), eq(packageTestSeries.testSeriesId, testSeriesId))).get();
+  if (existing) return c.json({ id: existing.id, testSeriesId });
   const id = crypto.randomUUID();
-  await db.insert(packageTestSeries).values({ id, courseId, testSeriesId: b.testSeriesId });
+  await db.insert(packageTestSeries).values({ id, courseId, testSeriesId });
   await audit(c, "course.testseries.attach", "courses", courseId);
-  return c.json({ id });
+  return c.json({ id, testSeriesId });
 });
 
 // Detach a test series from a package course.
