@@ -103,7 +103,7 @@ export default function Courses() {
           status: f.status,
           position: Number(f.position),
           isPackage: f.isPackage,
-          includesTestSeries: f.isPackage && f.includesTestSeries,
+          includesTestSeries: f.includesTestSeries,
         }),
       });
       setF(emptyForm);
@@ -235,21 +235,19 @@ export default function Courses() {
                 {/* Package / multiple courses */}
                 <div className="rounded-xl border border-gold-200 bg-gold-50/60 p-3 sm:col-span-2">
                   <label className="flex cursor-pointer items-start gap-3">
-                    <input type="checkbox" className="mt-0.5" checked={f.isPackage} onChange={(e) => set({ isPackage: e.target.checked, includesTestSeries: e.target.checked ? f.includesTestSeries : false })} />
+                    <input type="checkbox" className="mt-0.5" checked={f.isPackage} onChange={(e) => set({ isPackage: e.target.checked })} />
                     <span>
                       <span className="block text-sm font-semibold text-ink">This is a package (multiple courses)</span>
                       <span className="block text-xs text-muted">A package bundles several sub-courses (e.g. TNPSC Group 1, 2, 2A, 4). After creating it, you'll add sub-courses instead of modules — each sub-course has its own modules & live classes. Buying the package unlocks all of them.</span>
                     </span>
                   </label>
-                  {f.isPackage && (
-                    <label className="mt-3 flex cursor-pointer items-start gap-3 border-t border-gold-200 pt-3">
-                      <input type="checkbox" className="mt-0.5" checked={f.includesTestSeries} onChange={(e) => set({ includesTestSeries: e.target.checked })} />
-                      <span>
-                        <span className="block text-sm font-semibold text-ink">Include test series in this package</span>
-                        <span className="block text-xs text-muted">Adds a “Test Series” tab so you can create test series bundled with this package. Buying it unlocks those test series too.</span>
-                      </span>
-                    </label>
-                  )}
+                  <label className="mt-3 flex cursor-pointer items-start gap-3 border-t border-gold-200 pt-3">
+                    <input type="checkbox" className="mt-0.5" checked={f.includesTestSeries} onChange={(e) => set({ includesTestSeries: e.target.checked })} />
+                    <span>
+                      <span className="block text-sm font-semibold text-ink">Include test series</span>
+                      <span className="block text-xs text-muted">Adds a “Test Series” tab so you can create test series bundled with this {f.isPackage ? "package" : "course"}. Buying it unlocks those test series too.</span>
+                    </span>
+                  </label>
                 </div>
 
                 {/* Introduction PDF — shown on the public course page for anyone to download */}

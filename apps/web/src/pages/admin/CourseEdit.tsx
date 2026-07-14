@@ -71,13 +71,14 @@ export default function CourseEdit() {
   // shows a "Sub-courses" tab in place of Curriculum + Mock Tests.
   const isPackage = !!data.course.isPackage;
   const includesTs = !!data.course.includesTestSeries;
+  const tsTab = includesTs ? [{ id: "test_series", label: "Test Series" }] : [];
   const tabs: { id: string; label: string }[] = isPackage
     ? [
         { id: "details", label: "Details" },
         { id: "sub_courses", label: "Sub-courses" },
-        ...(includesTs ? [{ id: "test_series", label: "Test Series" }] : []),
+        ...tsTab,
       ]
-    : [...TABS];
+    : [...TABS, ...tsTab];
 
   const rupees = (paise: number | null | undefined) => (paise ? paise / 100 : 0);
 
@@ -190,15 +191,13 @@ export default function CourseEdit() {
             <div><Label>Tags (comma-separated)</Label><Input value={form.tags || ""} onChange={(e) => set({ tags: e.target.value })} placeholder="AI, LLM, RAG" /></div>
           </Card>
 
-          {isPackage && (
-            <Card className="space-y-2">
-              <h2 className="font-semibold text-ink">Package options</h2>
-              <label className="flex items-center gap-2 text-sm text-ink">
-                <input type="checkbox" checked={!!form.includesTestSeries} onChange={(e) => set({ includesTestSeries: e.target.checked })} /> Include test series in this package
-              </label>
-              <p className="text-xs text-muted">Adds a “Test Series” tab so you can bundle test series with this package. Click <b>Save changes</b> to apply.</p>
-            </Card>
-          )}
+          <Card className="space-y-2">
+            <h2 className="font-semibold text-ink">Test series</h2>
+            <label className="flex items-center gap-2 text-sm text-ink">
+              <input type="checkbox" checked={!!form.includesTestSeries} onChange={(e) => set({ includesTestSeries: e.target.checked })} /> Include test series in this {isPackage ? "package" : "course"}
+            </label>
+            <p className="text-xs text-muted">Adds a “Test Series” tab so you can bundle test series. Click <b>Save changes</b> to apply.</p>
+          </Card>
 
           <Card className="space-y-3">
             <h2 className="font-semibold text-ink">Media</h2>
@@ -254,8 +253,8 @@ export default function CourseEdit() {
       {/* SUB-COURSES (packages only) */}
       {tab === "sub_courses" && isPackage && <SubCourses packageId={id!} children={data.children || []} reload={load} />}
 
-      {/* TEST SERIES (packages that include test series) */}
-      {tab === "test_series" && isPackage && includesTs && <PackageTestSeries packageId={id!} attached={data.packagedTestSeries || []} reload={load} />}
+      {/* TEST SERIES (courses/packages that include test series) */}
+      {tab === "test_series" && includesTs && <PackageTestSeries packageId={id!} attached={data.packagedTestSeries || []} reload={load} />}
     </div>
   );
 }

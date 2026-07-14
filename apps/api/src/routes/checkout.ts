@@ -267,7 +267,13 @@ export async function fulfill(db: Db, env: Env, userId: string, orderId: string)
       continue;
     } else continue;
 
-    if (courseId) await enrollCourse(db, env, userId, courseId, validityDays, variantId);
+    if (courseId) {
+      await enrollCourse(db, env, userId, courseId, validityDays, variantId);
+      // A non-package course can also bundle test series ("Include test series").
+      const bundledTs = await db.select({ testSeriesId: packageTestSeries.testSeriesId })
+        .from(packageTestSeries).where(eq(packageTestSeries.courseId, courseId)).all();
+      for (const t of bundledTs) await enrollTestSeries(db, env, userId, t.testSeriesId, validityDays);
+    }
   }
 
   // Generate + email the invoice for paid orders (idempotent — one per order).
