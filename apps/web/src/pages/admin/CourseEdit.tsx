@@ -263,8 +263,12 @@ function PackageTestSeries({ packageId, attached, reload }: { packageId: string;
 
   const remove = async (t: PackagedTS) => {
     if (!window.confirm(`Remove "${t.title}" from this package?\n\nThis un-bundles the test series (the series and its tests remain under Test Series).`)) return;
-    await api(`/admin/courses/${packageId}/test-series/${t.id}`, { method: "DELETE" });
-    reload();
+    try {
+      await api(`/admin/courses/${packageId}/test-series/${t.id}`, { method: "DELETE" });
+      reload();
+    } catch (err) {
+      alert(`Could not remove "${t.title}": ${(err as Error)?.message || "unknown error"}`);
+    }
   };
 
   return (
@@ -324,8 +328,12 @@ function SubCourses({ packageId, children, reload }: { packageId: string; childr
 
   const remove = async (c: ChildCourse) => {
     if (!window.confirm(`Delete sub-course "${c.title}"?\n\nThis permanently removes it and all of its modules, lessons and live classes. This cannot be undone.`)) return;
-    await api(`/admin/courses/${c.id}`, { method: "DELETE" });
-    reload();
+    try {
+      await api(`/admin/courses/${c.id}`, { method: "DELETE" });
+      reload();
+    } catch (err) {
+      alert(`Could not delete "${c.title}": ${(err as Error)?.message || "unknown error"}`);
+    }
   };
 
   return (

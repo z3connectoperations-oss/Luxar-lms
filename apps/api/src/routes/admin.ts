@@ -34,6 +34,7 @@ import {
   certificates,
   interviewSessions,
 } from "@luxar/db";
+import type { Db } from "@luxar/db";
 import { requireRole } from "../middleware";
 import type { AppEnv } from "../types";
 
@@ -381,15 +382,9 @@ admin.patch("/courses/:id", async (c) => {
   return c.json({ ok: true });
 });
 
-admin.delete("/courses/:id", async (c) => {
-  const db = c.get("db");
-  const id = c.req.param("id");
-  // A package must be emptied first — refuse while sub-courses still point to it.
-  const childCount = await db.$count(courses, eq(courses.parentCourseId, id));
-  if (childCount > 0) return c.json({ error: "This package still has sub-courses. Delete them first." }, 400);
-  // Cascade-delete everything that references this course (children first) so the
-  // delete always succeeds and leaves no orphan rows. Financial records (orders /
-  // order_items) are intentionally kept; only the course-side data is removed.
+// Delete a single course and everything that references it (modules, lessons,
+// tests, live sessions, enrollments, package links, …). Orders/order_items kept.
+async function cascadeDeleteCourse(db: Db, id: string) {
   await db.run(sql`DELETE FROM attempt_answers WHERE attempt_id IN (SELECT id FROM test_attempts WHERE test_id IN (SELECT id FROM tests WHERE course_id = ${id}))`);
   await db.run(sql`DELETE FROM descriptive_submissions WHERE attempt_id IN (SELECT id FROM test_attempts WHERE test_id IN (SELECT id FROM tests WHERE course_id = ${id}))`);
   await db.run(sql`DELETE FROM test_attempts WHERE test_id IN (SELECT id FROM tests WHERE course_id = ${id})`);
@@ -412,8 +407,38 @@ admin.delete("/courses/:id", async (c) => {
   await db.run(sql`DELETE FROM coupons WHERE course_id = ${id}`);
   await db.run(sql`DELETE FROM package_test_series WHERE course_id = ${id}`);
   await db.delete(courses).where(eq(courses.id, id));
+}
+
+// Delete a single test series and all of its tests/questions/attempts/enrollments.
+async function cascadeDeleteTestSeries(db: Db, id: string) {
+  await db.run(sql`DELETE FROM test_series_attempt_answers WHERE attempt_id IN (SELECT id FROM test_series_attempts WHERE test_id IN (SELECT id FROM test_series_tests WHERE test_series_id = ${id}))`);
+  await db.run(sql`DELETE FROM test_series_attempts WHERE test_id IN (SELECT id FROM test_series_tests WHERE test_series_id = ${id})`);
+  await db.run(sql`DELETE FROM test_series_questions WHERE test_id IN (SELECT id FROM test_series_tests WHERE test_series_id = ${id})`);
+  await db.run(sql`DELETE FROM test_series_tests WHERE test_series_id = ${id}`);
+  await db.run(sql`DELETE FROM test_series_enrollments WHERE test_series_id = ${id}`);
+  await db.run(sql`DELETE FROM package_test_series WHERE test_series_id = ${id}`);
+  await db.run(sql`DELETE FROM test_series WHERE id = ${id}`);
+}
+
+admin.delete("/courses/:id", async (c) => {
+  const db = c.get("db");
+  const id = c.req.param("id");
+  const course = await db.select().from(courses).where(eq(courses.id, id)).get();
+  if (!course) return c.json({ error: "not found" }, 404);
+
+  // A package deletes everything it contains: its sub-courses (and their content)
+  // and its package-owned test series (and their content). Financial records
+  // (orders / order_items) are intentionally kept.
+  const childIds = (await db.select({ id: courses.id }).from(courses).where(eq(courses.parentCourseId, id)).all()).map((r) => r.id);
+  const courseIds = [id, ...childIds];
+  const bundledTsIds = (await db.select({ tsId: packageTestSeries.testSeriesId }).from(packageTestSeries)
+    .where(inArray(packageTestSeries.courseId, courseIds)).all()).map((r) => r.tsId);
+
+  for (const cid of courseIds) await cascadeDeleteCourse(db, cid);
+  for (const tsId of bundledTsIds) await cascadeDeleteTestSeries(db, tsId);
+
   await audit(c, "course.delete", "courses", id);
-  return c.json({ ok: true });
+  return c.json({ ok: true, deletedSubCourses: childIds.length, deletedTestSeries: bundledTsIds.length });
 });
 
 // ---- Variants -------------------------------------------------------------

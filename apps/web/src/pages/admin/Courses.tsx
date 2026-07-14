@@ -11,6 +11,7 @@ const BASE = import.meta.env.VITE_API_URL || "http://localhost:8787";
 interface Course {
   id: string; title: string; slug: string; status: string; categoryName: string | null;
   thumbnailR2Key: string | null; level: string | null; price: number | null; position: number;
+  isPackage?: boolean;
 }
 interface Category { id: string; name: string }
 interface Trainer { id: string; name: string }
@@ -113,11 +114,16 @@ export default function Courses() {
 
 
   const remove = async (c: Course) => {
-    if (!window.confirm(`Delete "${c.title}"?\n\nThis permanently removes the course and ALL of its modules, lessons, materials, tests, live sessions/recordings, and enrollments. This cannot be undone.`)) return;
+    const msg = c.isPackage
+      ? `Delete package "${c.title}"?\n\nThis permanently removes the package AND all of its sub-courses and bundled test series (with their modules, lessons, tests, live sessions and enrollments). This cannot be undone.`
+      : `Delete "${c.title}"?\n\nThis permanently removes the course and ALL of its modules, lessons, materials, tests, live sessions/recordings, and enrollments. This cannot be undone.`;
+    if (!window.confirm(msg)) return;
     setDeletingId(c.id);
     try {
       await api(`/admin/courses/${c.id}`, { method: "DELETE" });
       setCourses((prev) => prev.filter((x) => x.id !== c.id));
+    } catch (err) {
+      alert(`Could not delete "${c.title}": ${(err as Error)?.message || "unknown error"}`);
     } finally { setDeletingId(null); }
   };
 
