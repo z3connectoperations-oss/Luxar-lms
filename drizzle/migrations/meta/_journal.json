@@ -92,6 +92,13 @@
       "when": 1783620660928,
       "tag": "0012_phonepe_webhook_events",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1783720660928,
+      "tag": "0013_course_packages",
+      "breakpoints": true
     }
   ]
 }

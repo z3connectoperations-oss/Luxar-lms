@@ -192,6 +192,23 @@ checkout.post("/product-order", async (c) => {
   return c.json({ error: "Failed to initialize payment" }, 500);
 });
 
+// Enrol a user in a single course (idempotent) + notify. Reused for standalone
+// courses and for each sub-course of a purchased package.
+async function enrollCourse(db: Db, env: Env, userId: string, courseId: string, validityDays: number, variantId: string | null) {
+  const already = await db.select().from(enrollments)
+    .where(and(eq(enrollments.userId, userId), eq(enrollments.courseId, courseId))).get();
+  if (already) { console.log(`[fulfill] already enrolled in ${courseId}`); return; }
+  await db.insert(enrollments).values({
+    id: crypto.randomUUID(), userId, courseId, variantId,
+    expiryDate: new Date(Date.now() + validityDays * 86400000), progressPct: 0,
+  });
+  console.log(`[fulfill] enrolled user=${userId} course=${courseId}`);
+  await createNotification(db, env, {
+    userId, type: "enrollment", title: "Enrollment confirmed",
+    body: "You now have access to your course. Happy learning!", link: "/student",
+  });
+}
+
 // Fulfilment: mark paid + create enrollment(s) + notify.
 export async function fulfill(db: Db, env: Env, userId: string, orderId: string) {
   await db.update(orders).set({ status: "paid" }).where(eq(orders.id, orderId));
@@ -212,6 +229,13 @@ export async function fulfill(db: Db, env: Env, userId: string, orderId: string)
       // course-direct stores the courseId in productId; validity = course.durationDays
       const course = await db.select().from(courses).where(eq(courses.id, item.productId)).get();
       if (!course) { console.warn(`[fulfill] course not found (deleted?): ${item.productId} — cannot enrol`); continue; }
+      if (course.isPackage) {
+        // Package → flat: enrol the student in every sub-course.
+        const children = await db.select().from(courses).where(eq(courses.parentCourseId, course.id)).all();
+        console.log(`[fulfill] package ${course.id} -> ${children.length} sub-course(s)`);
+        for (const child of children) await enrollCourse(db, env, userId, child.id, child.durationDays ?? 365, null);
+        continue;
+      }
       courseId = course.id; validityDays = course.durationDays ?? 365;
     } else if (item.kind === "test-series" && item.productId) {
       // Test Series fulfillment
@@ -232,18 +256,7 @@ export async function fulfill(db: Db, env: Env, userId: string, orderId: string)
       continue;
     } else continue;
 
-    const already = await db.select().from(enrollments)
-      .where(and(eq(enrollments.userId, userId), eq(enrollments.courseId, courseId))).get();
-    if (already) { console.log(`[fulfill] already enrolled in ${courseId}`); continue; }
-    await db.insert(enrollments).values({
-      id: crypto.randomUUID(), userId, courseId, variantId,
-      expiryDate: new Date(Date.now() + validityDays * 86400000), progressPct: 0,
-    });
-    console.log(`[fulfill] enrolled user=${userId} course=${courseId}`);
-    await createNotification(db, env, {
-      userId, type: "enrollment", title: "Enrollment confirmed",
-      body: "You now have access to your course. Happy learning!", link: "/student",
-    });
+    if (courseId) await enrollCourse(db, env, userId, courseId, validityDays, variantId);
   }
 
   // Generate + email the invoice for paid orders (idempotent — one per order).

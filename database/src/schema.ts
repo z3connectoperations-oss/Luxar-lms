@@ -73,6 +73,9 @@ export const courses = sqliteTable("courses", {
   categoryId: text("category_id").references(() => categories.id),
   trainerId: text("trainer_id").references(() => users.id), // assigned mentor
   examId: text("exam_id").references(() => exams.id), // legacy, optional
+  // Package/bundle support: a package course bundles several sub-courses.
+  isPackage: bool("is_package").default(false), // true = this course is a package
+  parentCourseId: text("parent_course_id"), // set on a sub-course → its package (self-ref, no FK)
   title: text("title").notNull(),
   slug: text("slug").notNull().unique(),
   summary: text("summary"),

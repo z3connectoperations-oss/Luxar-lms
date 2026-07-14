@@ -263,10 +263,13 @@ admin.get("/courses/:id", async (c) => {
   const id = c.req.param("id");
   const course = await db.select().from(courses).where(eq(courses.id, id)).get();
   if (!course) return c.json({ error: "not found" }, 404);
-  const [variants, mods, mats] = await Promise.all([
+  const [variants, mods, mats, children] = await Promise.all([
     db.select().from(courseVariants).where(eq(courseVariants.courseId, id)).all(),
     db.select().from(modules).where(eq(modules.courseId, id)).orderBy(modules.position).all(),
     db.select().from(materials).where(eq(materials.courseId, id)).all(),
+    // Sub-courses (for a package). Empty for a normal course.
+    db.select({ id: courses.id, title: courses.title, slug: courses.slug, status: courses.status, thumbnailR2Key: courses.thumbnailR2Key, position: courses.position })
+      .from(courses).where(eq(courses.parentCourseId, id)).orderBy(courses.position).all(),
   ]);
   const moduleIds = mods.map((m) => m.id);
   const allLessons = moduleIds.length
@@ -278,6 +281,7 @@ admin.get("/courses/:id", async (c) => {
     variants,
     materials: mats,
     modules: mods.map((m) => ({ ...m, lessons: lessonsByModule(m.id) })),
+    children,
   });
 });
 
@@ -309,6 +313,8 @@ admin.post("/courses", async (c) => {
     position: b.position ?? 0,
     completionRule: b.completionRule || "allLessons",
     minProgressPct: b.minProgressPct ?? 100,
+    isPackage: b.isPackage ?? false,
+    parentCourseId: b.parentCourseId || null,
   });
   await audit(c, "course.create", "courses", id);
   return c.json({ id });
@@ -325,6 +331,9 @@ admin.patch("/courses/:id", async (c) => {
 admin.delete("/courses/:id", async (c) => {
   const db = c.get("db");
   const id = c.req.param("id");
+  // A package must be emptied first — refuse while sub-courses still point to it.
+  const childCount = await db.$count(courses, eq(courses.parentCourseId, id));
+  if (childCount > 0) return c.json({ error: "This package still has sub-courses. Delete them first." }, 400);
   // Cascade-delete everything that references this course (children first) so the
   // delete always succeeds and leaves no orphan rows. Financial records (orders /
   // order_items) are intentionally kept; only the course-side data is removed.

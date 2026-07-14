@@ -36,6 +36,7 @@ const emptyForm = {
   downloadableEnabled: true, liveClassesEnabled: true,
   completionRule: "allLessons", minProgressPct: 100,
   status: "draft", position: 0,
+  isPackage: false,
 };
 type Form = typeof emptyForm;
 
@@ -99,6 +100,7 @@ export default function Courses() {
           minProgressPct: Number(f.minProgressPct),
           status: f.status,
           position: Number(f.position),
+          isPackage: f.isPackage,
         }),
       });
       setF(emptyForm);
@@ -221,6 +223,15 @@ export default function Courses() {
                   <Label>Description</Label>
                   <Textarea value={f.descriptionMd} onChange={(e) => set({ descriptionMd: e.target.value })} placeholder="What students will learn (markdown supported)" />
                 </div>
+
+                {/* Package / multiple courses */}
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-gold-200 bg-gold-50/60 p-3 sm:col-span-2">
+                  <input type="checkbox" className="mt-0.5" checked={f.isPackage} onChange={(e) => set({ isPackage: e.target.checked })} />
+                  <span>
+                    <span className="block text-sm font-semibold text-ink">This is a package (multiple courses)</span>
+                    <span className="block text-xs text-muted">A package bundles several sub-courses (e.g. TNPSC Group 1, 2, 2A, 4). After creating it, you'll add sub-courses instead of modules — each sub-course has its own modules & live classes. Buying the package unlocks all of them.</span>
+                  </span>
+                </label>
 
                 {/* Introduction PDF — shown on the public course page for anyone to download */}
                 <div className="sm:col-span-2">

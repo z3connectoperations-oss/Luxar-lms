@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, desc, inArray, asc } from "drizzle-orm";
+import { eq, desc, inArray, asc, and, isNull } from "drizzle-orm";
 import {
   courses,
   categories,
@@ -44,7 +44,9 @@ const effectivePrice = (co: { price: number | null; discountPrice: number | null
 site.get("/courses", async (c) => {
   const db = c.get("db");
   const list = await db.select().from(courses)
-    .where(inArray(courses.status, ["active", "coming_soon"]))
+    // Sub-courses (parent_course_id set) never appear in the catalogue — only
+    // packages and standalone courses do.
+    .where(and(inArray(courses.status, ["active", "coming_soon"]), isNull(courses.parentCourseId)))
     .orderBy(asc(courses.position))
     .all();
   const cats = await db.select().from(categories).all();
@@ -58,6 +60,7 @@ site.get("/courses", async (c) => {
         category: cat?.name ?? null, categorySlug: cat?.slug ?? null,
         price: co.price ?? 0, discountPrice: co.discountPrice ?? null,
         fromPrice: effectivePrice(co), // for legacy card compatibility
+        isPackage: !!co.isPackage,
         status: co.status, position: co.position
       };
     }),
@@ -84,6 +87,12 @@ site.get("/courses/:slug", async (c) => {
     };
   });
 
+  // For a package, list the bundled sub-courses ("This package includes…").
+  const subCourses = course.isPackage
+    ? await db.select({ id: courses.id, title: courses.title, summary: courses.summary, thumbnailR2Key: courses.thumbnailR2Key })
+        .from(courses).where(eq(courses.parentCourseId, course.id)).orderBy(asc(courses.position)).all()
+    : [];
+
   return c.json({
     course: {
       id: course.id, title: course.title, slug: course.slug, summary: course.summary,
@@ -91,11 +100,13 @@ site.get("/courses/:slug", async (c) => {
       introPdfR2Key: course.introPdfR2Key,
       level: course.level, durationDays: course.durationDays,
       price: course.price ?? 0, discountPrice: course.discountPrice ?? null,
+      isPackage: !!course.isPackage,
     },
     category: cat ? { name: cat.name, slug: cat.slug } : null,
     trainer: trainer ? { name: trainer.name } : null,
     variants,
     curriculum,
+    subCourses,
   });
 });
 

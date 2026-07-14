@@ -11,9 +11,11 @@ const BASE = import.meta.env.VITE_API_URL || "http://localhost:8787";
 
 interface Lesson { id: string; title: string; type: string; status: string; r2Key: string | null; isFreePreview?: boolean }
 interface Module { id: string; title: string; lessons: Lesson[] }
+interface ChildCourse { id: string; title: string; slug: string; status: string; thumbnailR2Key: string | null }
 interface CourseData {
   course: any;
   modules: Module[];
+  children?: ChildCourse[];
 }
 
 const DURATIONS = [
@@ -50,6 +52,13 @@ export default function CourseEdit() {
   }, []);
 
   if (!data) return <div className="text-muted">Loading…</div>;
+
+  // A package bundles sub-courses instead of having its own modules/tests, so it
+  // shows a "Sub-courses" tab in place of Curriculum + Mock Tests.
+  const isPackage = !!data.course.isPackage;
+  const tabs = isPackage
+    ? ([{ id: "details", label: "Details" }, { id: "sub_courses", label: "Sub-courses" }] as const)
+    : TABS;
 
   const rupees = (paise: number | null | undefined) => (paise ? paise / 100 : 0);
 
@@ -106,7 +115,7 @@ export default function CourseEdit() {
 
       {/* Tabs */}
       <div className="flex flex-wrap gap-1 border-b border-border">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
@@ -207,11 +216,80 @@ export default function CourseEdit() {
       )}
 
       {/* CURRICULUM */}
-      {tab === "curriculum" && <Modules courseId={id!} modules={data.modules} reload={load} />}
+      {tab === "curriculum" && !isPackage && <Modules courseId={id!} modules={data.modules} reload={load} />}
 
       {/* MOCK TESTS */}
-      {tab === "mock_tests" && <CourseMockTests courseId={id!} />}
+      {tab === "mock_tests" && !isPackage && <CourseMockTests courseId={id!} />}
+
+      {/* SUB-COURSES (packages only) */}
+      {tab === "sub_courses" && isPackage && <SubCourses packageId={id!} children={data.children || []} reload={load} />}
     </div>
+  );
+}
+
+// The list of courses bundled inside a package. "Add to Course" creates a new
+// child course (parentCourseId = this package); each child is managed like a
+// normal course (its own modules, lessons, live classes) via its Manage link.
+function SubCourses({ packageId, children, reload }: { packageId: string; children: ChildCourse[]; reload: () => void }) {
+  const [title, setTitle] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const add = async () => {
+    if (!title.trim()) return;
+    setBusy(true);
+    try {
+      await api("/admin/courses", {
+        method: "POST",
+        body: JSON.stringify({ title: title.trim(), parentCourseId: packageId, status: "active", price: 0 }),
+      });
+      setTitle("");
+      reload();
+    } finally { setBusy(false); }
+  };
+
+  const remove = async (c: ChildCourse) => {
+    if (!window.confirm(`Delete sub-course "${c.title}"?\n\nThis permanently removes it and all of its modules, lessons and live classes. This cannot be undone.`)) return;
+    await api(`/admin/courses/${c.id}`, { method: "DELETE" });
+    reload();
+  };
+
+  return (
+    <Card className="space-y-4">
+      <div className="flex items-baseline justify-between gap-2">
+        <div>
+          <h2 className="font-semibold text-ink">Sub-courses in this package</h2>
+          <p className="text-xs text-muted">Buying this package unlocks every sub-course below. Open one to add its modules, lessons & live classes.</p>
+        </div>
+        <span className="text-xs text-muted">{children.length} course{children.length === 1 ? "" : "s"}</span>
+      </div>
+
+      {children.length > 0 && (
+        <div className="space-y-2">
+          {children.map((c) => (
+            <div key={c.id} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
+              <div className="flex min-w-0 items-center gap-3">
+                {c.thumbnailR2Key
+                  ? <img src={mediaUrl(c.thumbnailR2Key) || ""} alt="" className="h-10 w-16 shrink-0 rounded object-cover" />
+                  : <div className="grid h-10 w-16 shrink-0 place-items-center rounded bg-canvas text-muted">📘</div>}
+                <div className="min-w-0">
+                  <div className="truncate font-semibold text-ink">{c.title}</div>
+                  <div className="truncate text-xs text-muted">/{c.slug} · {c.status}</div>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-3">
+                <Link to={`/admin/courses/${c.id}`}><Button size="sm" variant="outline">Manage</Button></Link>
+                <button className="text-xs font-semibold text-accent-pink hover:underline" onClick={() => remove(c)}>Delete</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex gap-2 rounded-lg border border-dashed border-border p-3">
+        <Input placeholder="New sub-course title (e.g. TNPSC Group 1)" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} />
+        <Button variant="outline" onClick={add} disabled={busy || !title.trim()}>{busy ? "Adding…" : "+ Add to Course"}</Button>
+      </div>
+    </Card>
   );
 }
 
