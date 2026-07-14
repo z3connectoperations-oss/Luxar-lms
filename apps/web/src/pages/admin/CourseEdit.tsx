@@ -54,6 +54,10 @@ export default function CourseEdit() {
     api<CourseData>(`/admin/courses/${id}`).then((d) => { setData(d); setForm(d.course); });
   }, [id]);
   useEffect(load, [load]);
+  // Navigating to a different course (e.g. Manage on a package's sub-course) reuses
+  // this component, so reset to Details — otherwise a stale tab like "sub_courses"
+  // matches nothing on a non-package course and the page renders blank.
+  useEffect(() => { setTab("details"); }, [id]);
   useEffect(() => {
     loadCats().then((d) => setCats(d.categories)).catch(() => {});
     loadTrainers().then((d) => setTrainers(d.trainers)).catch(() => {});
