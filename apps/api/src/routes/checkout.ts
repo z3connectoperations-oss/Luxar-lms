@@ -283,28 +283,33 @@ export async function fulfill(db: Db, env: Env, userId: string, orderId: string)
 // Money helper (paise → ₹).
 const money = (paise: number) => "₹" + (paise / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// Build a styled HTML invoice email.
-function buildInvoiceHtml(d: { invoiceNumber: string; studentName: string; lineItems: { title: string; amount: number }[]; total: number; businessDetails: string }) {
+// Build a styled HTML "congratulations + receipt" email.
+function buildInvoiceHtml(d: { invoiceNumber: string; studentName: string; lineItems: { title: string; amount: number }[]; total: number; businessDetails: string; portalUrl?: string }) {
   const date = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" });
   const rows = d.lineItems
     .map((li) => `<tr><td style="padding:10px 0;border-bottom:1px solid #eee;color:#111">${li.title}</td><td style="padding:10px 0;border-bottom:1px solid #eee;text-align:right;color:#111">${money(li.amount)}</td></tr>`)
     .join("");
+  const purchased = d.lineItems.map((li) => li.title).join(", ");
+  const cta = d.portalUrl
+    ? `<div style="margin:22px 0 6px"><a href="${d.portalUrl}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;font-size:14px;font-weight:bold;padding:12px 22px;border-radius:10px">Start learning →</a></div>`
+    : "";
   return `<!doctype html><html><body style="margin:0;background:#f5f5f5;font-family:Arial,Helvetica,sans-serif">
   <div style="max-width:560px;margin:24px auto;background:#fff;border-radius:14px;overflow:hidden;border:1px solid #eaeaea">
     <div style="background:#111;color:#fff;padding:22px 28px">
       <div style="font-size:20px;font-weight:bold;letter-spacing:-.5px">Luxaar Institute</div>
-      <div style="font-size:12px;color:#c7a75b;margin-top:2px">Payment Receipt &amp; Invoice</div>
+      <div style="font-size:12px;color:#c7a75b;margin-top:2px">Enrolment confirmed &amp; Receipt</div>
     </div>
     <div style="padding:24px 28px">
-      <p style="color:#333;font-size:14px;margin:0 0 8px">Hi ${d.studentName},</p>
-      <p style="color:#555;font-size:14px;line-height:1.6;margin:0 0 18px">Thank you for your purchase — your payment was received and your access is now active. Here is your invoice:</p>
-      <table style="width:100%;font-size:13px;color:#555;margin:0 0 8px"><tr><td>Invoice No.</td><td style="text-align:right;font-weight:bold;color:#111">${d.invoiceNumber}</td></tr><tr><td>Date</td><td style="text-align:right;color:#111">${date}</td></tr></table>
+      <p style="color:#111;font-size:17px;font-weight:bold;margin:0 0 6px">🎉 Congratulations, ${d.studentName}!</p>
+      <p style="color:#555;font-size:14px;line-height:1.6;margin:0 0 16px">Your payment was successful and you're now enrolled in <b style="color:#111">${purchased}</b>. Your access is active right away — log in to start learning. Your invoice is attached to this email as a PDF.</p>
+      ${cta}
+      <table style="width:100%;font-size:13px;color:#555;margin:14px 0 8px"><tr><td>Invoice No.</td><td style="text-align:right;font-weight:bold;color:#111">${d.invoiceNumber}</td></tr><tr><td>Date</td><td style="text-align:right;color:#111">${date}</td></tr></table>
       <table style="width:100%;font-size:14px;border-collapse:collapse;margin-top:8px">
         <thead><tr><th style="text-align:left;padding-bottom:8px;color:#999;font-size:11px;text-transform:uppercase">Item</th><th style="text-align:right;padding-bottom:8px;color:#999;font-size:11px;text-transform:uppercase">Amount</th></tr></thead>
         <tbody>${rows}</tbody>
         <tfoot><tr><td style="padding-top:14px;font-weight:bold;color:#111">Total Paid</td><td style="padding-top:14px;text-align:right;font-weight:bold;font-size:16px;color:#111">${money(d.total)}</td></tr></tfoot>
       </table>
-      <p style="color:#999;font-size:12px;margin-top:26px;line-height:1.6">${d.businessDetails}<br/>This is a system-generated invoice — no signature required.</p>
+      <p style="color:#999;font-size:12px;margin-top:26px;line-height:1.6">${d.businessDetails}<br/>Questions? Just reply to this email.<br/>This is a system-generated receipt — no signature required.</p>
     </div>
   </div></body></html>`;
 }
@@ -376,9 +381,11 @@ async function maybeCreateInvoiceAndEmail(db: Db, env: Env, userId: string, orde
     });
 
     if (buyer?.email) {
-      const html = buildInvoiceHtml({ invoiceNumber, studentName: buyer.name || "Student", lineItems, total, businessDetails });
+      const portalUrl = (env.CORS_ORIGIN || "").split(",")[0].trim().replace(/\/$/, "") + "/student";
+      const html = buildInvoiceHtml({ invoiceNumber, studentName: buyer.name || "Student", lineItems, total, businessDetails, portalUrl });
       const attachments = pdfBytes ? [{ filename: `Invoice-${invoiceNumber}.pdf`, content: toBase64(pdfBytes) }] : undefined;
-      await sendEmail(env, buyer.email, `Your Luxaar Institute invoice ${invoiceNumber}`, { html, attachments }).catch((e) => console.error("[invoice] email send failed:", e));
+      const firstItem = lineItems[0]?.title || "your course";
+      await sendEmail(env, buyer.email, `🎉 You're enrolled in ${firstItem} — Luxaar Institute receipt`, { html, attachments }).catch((e) => console.error("[invoice] email send failed:", e));
       console.log(`[invoice] created ${invoiceNumber} (pdf=${!!pdfBytes}) emailed to ${buyer.email}`);
     } else {
       console.warn(`[invoice] created ${invoiceNumber} but buyer has no email`);
