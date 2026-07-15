@@ -57,6 +57,19 @@ const audit = (c: any, action: string, entity: string, entityId: string) =>
     entityId,
   });
 
+// Upload a file to R2 (course/test-series thumbnails & banners, PDFs, etc.).
+// Returns the stored object key, which the caller saves on the record and later
+// resolves to a URL via /files/:key.
+admin.put("/upload", async (c) => {
+  const folder = (c.req.query("folder") || "uploads").replace(/[^a-z0-9/_-]/gi, "");
+  const filename = (c.req.query("filename") || "file").replace(/[^a-z0-9._-]/gi, "_");
+  const key = `${folder}/${crypto.randomUUID()}-${filename}`;
+  await c.env.BUCKET.put(key, await c.req.arrayBuffer(), {
+    httpMetadata: { contentType: c.req.header("content-type") || "application/octet-stream" },
+  });
+  return c.json({ key });
+});
+
 // ---- Dashboard stats ------------------------------------------------------
 admin.get("/stats", async (c) => {
   const db = c.get("db");

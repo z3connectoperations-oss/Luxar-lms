@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../../lib/api";
+import { api, authHeaders } from "../../lib/api";
 import { Button, Card, Input, Textarea, Label, Chip } from "../../components/ui";
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:8787";
@@ -18,7 +18,7 @@ export default function Categories() {
     setBusy(true);
     try {
       const res = await fetch(`${BASE}/admin/upload?folder=categories&filename=${encodeURIComponent(file.name)}`, {
-        method: "PUT", credentials: "include", headers: { "Content-Type": file.type || "application/octet-stream" }, body: file,
+        method: "PUT", credentials: "include", headers: { "Content-Type": file.type || "application/octet-stream", ...authHeaders() }, body: file,
       });
       const { key } = await res.json();
       setThumb(key);
