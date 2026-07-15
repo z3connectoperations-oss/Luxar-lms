@@ -57,6 +57,9 @@ export async function sendEmail(
     body: JSON.stringify({
       from: env.EMAIL_FROM || "Luxaar Institute <onboarding@resend.dev>",
       to,
+      // Replies go to the institute's real inbox (e.g. Gmail), even though the
+      // technical sender must be a verified domain.
+      ...(env.EMAIL_REPLY_TO ? { reply_to: env.EMAIL_REPLY_TO } : {}),
       subject,
       ...(opts.html ? { html: opts.html } : {}),
       ...(opts.text ? { text: opts.text } : {}),

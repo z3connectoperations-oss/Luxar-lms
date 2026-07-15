@@ -13,6 +13,7 @@ export interface AppEnv {
     // Optional email (Resend). Email is skipped when absent.
     RESEND_API_KEY?: string;
     EMAIL_FROM?: string;
+    EMAIL_REPLY_TO?: string; // e.g. luxaarinstitute@gmail.com — student replies land here
     // LiveKit Cloud (live classes). Token minting needs these.
     LIVEKIT_API_KEY?: string;
     LIVEKIT_API_SECRET?: string;
