@@ -143,11 +143,26 @@ export const coupons = sqliteTable("coupons", {
   active: bool("active").default(true),
 });
 
+// Subject (Section) — the grouping layer between a course and its modules.
+// Course → Subject → Module → Lesson. Modules keep courseId for backward
+// compatibility; subjectId groups them (null = legacy/ungrouped).
+export const subjects = sqliteTable("subjects", {
+  id: id(),
+  courseId: text("course_id")
+    .notNull()
+    .references(() => courses.id),
+  title: text("title").notNull(),
+  description: text("description"),
+  position: integer("position").notNull().default(0),
+  status: text("status").notNull().default("published"), // published | draft
+});
+
 export const modules = sqliteTable("modules", {
   id: id(),
   courseId: text("course_id")
     .notNull()
     .references(() => courses.id),
+  subjectId: text("subject_id"), // → subjects.id (null = not yet grouped)
   title: text("title").notNull(),
   position: integer("position").notNull().default(0),
 });

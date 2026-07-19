@@ -30,6 +30,7 @@ import {
   testSeriesQuestions,
   testSeriesAttempts,
   packageTestSeries,
+  subjects,
   lessonProgress,
   certificates,
   interviewSessions,
@@ -280,7 +281,7 @@ admin.get("/courses/:id", async (c) => {
   const id = c.req.param("id");
   // None of these depend on the course row (all keyed by the URL param), so fire
   // them in one parallel batch — one round-trip instead of two.
-  const [course, variants, mods, mats, children, pkgTs] = await Promise.all([
+  const [course, variants, mods, mats, children, pkgTs, subs] = await Promise.all([
     db.select().from(courses).where(eq(courses.id, id)).get(),
     db.select().from(courseVariants).where(eq(courseVariants.courseId, id)).all(),
     db.select().from(modules).where(eq(modules.courseId, id)).orderBy(modules.position).all(),
@@ -293,6 +294,8 @@ admin.get("/courses/:id", async (c) => {
       .from(packageTestSeries)
       .innerJoin(testSeries, eq(packageTestSeries.testSeriesId, testSeries.id))
       .where(eq(packageTestSeries.courseId, id)).all(),
+    // Subjects (sections) grouping the modules. Empty = legacy flat curriculum.
+    db.select().from(subjects).where(eq(subjects.courseId, id)).orderBy(subjects.position).all(),
   ]);
   if (!course) return c.json({ error: "not found" }, 404);
   const moduleIds = mods.map((m) => m.id);
@@ -306,9 +309,43 @@ admin.get("/courses/:id", async (c) => {
     variants,
     materials: mats,
     modules: mods.map((m) => ({ ...m, lessons: lessonsByModule(m.id) })),
+    subjects: subs,
     children,
     packagedTestSeries: pkgTs,
   });
+});
+
+// ---- Subjects (Course → Subject → Module → Lesson) ------------------------
+admin.post("/courses/:id/subjects", async (c) => {
+  const b = await c.req.json();
+  if (!b?.title?.trim()) return c.json({ error: "title required" }, 400);
+  const id = crypto.randomUUID();
+  await c.get("db").insert(subjects).values({
+    id, courseId: c.req.param("id"), title: b.title.trim(),
+    description: b.description || null, position: b.position ?? 0,
+    status: b.status || "published",
+  });
+  await audit(c, "subject.create", "subjects", id);
+  return c.json({ id });
+});
+
+admin.patch("/subjects/:id", async (c) => {
+  const b = await c.req.json();
+  delete b.id; delete b.courseId;
+  await c.get("db").update(subjects).set(b).where(eq(subjects.id, c.req.param("id")));
+  await audit(c, "subject.update", "subjects", c.req.param("id"));
+  return c.json({ ok: true });
+});
+
+// Deleting a subject keeps its modules — they become ungrouped (subjectId null),
+// so no content is ever lost by reorganising.
+admin.delete("/subjects/:id", async (c) => {
+  const db = c.get("db");
+  const id = c.req.param("id");
+  await db.update(modules).set({ subjectId: null }).where(eq(modules.subjectId, id));
+  await db.delete(subjects).where(eq(subjects.id, id));
+  await audit(c, "subject.delete", "subjects", id);
+  return c.json({ ok: true });
 });
 
 // Add a test series to a package. Pass { title } to create a new package-owned
@@ -407,6 +444,7 @@ async function cascadeDeleteCourse(db: Db, id: string) {
   await db.run(sql`DELETE FROM lesson_progress WHERE lesson_id IN (SELECT id FROM lessons WHERE module_id IN (SELECT id FROM modules WHERE course_id = ${id}))`);
   await db.run(sql`DELETE FROM lessons WHERE module_id IN (SELECT id FROM modules WHERE course_id = ${id})`);
   await db.run(sql`DELETE FROM modules WHERE course_id = ${id}`);
+  await db.run(sql`DELETE FROM subjects WHERE course_id = ${id}`);
   await db.run(sql`DELETE FROM live_participants WHERE session_id IN (SELECT id FROM live_sessions WHERE course_id = ${id})`);
   await db.run(sql`DELETE FROM live_sessions WHERE course_id = ${id}`);
   await db.run(sql`DELETE FROM forum_posts WHERE thread_id IN (SELECT id FROM forum_threads WHERE course_id = ${id})`);
@@ -484,7 +522,7 @@ admin.delete("/variants/:id", async (c) => {
 admin.post("/courses/:id/modules", async (c) => {
   const b = await c.req.json();
   const id = crypto.randomUUID();
-  await c.get("db").insert(modules).values({ id, courseId: c.req.param("id"), title: b.title || "Untitled module", position: b.position ?? 0 });
+  await c.get("db").insert(modules).values({ id, courseId: c.req.param("id"), subjectId: b.subjectId || null, title: b.title || "Untitled module", position: b.position ?? 0 });
   return c.json({ id });
 });
 admin.patch("/modules/:id", async (c) => {

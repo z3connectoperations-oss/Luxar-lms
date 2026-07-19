@@ -13,11 +13,13 @@ import { useAuth } from "../auth/AuthContext";
 import { cn } from "../lib/cn";
 
 interface CurriculumLesson { title: string; type: string; isFreePreview: boolean }
-interface Module { id: string; title: string; lessonCount: number; lessons: CurriculumLesson[] }
+interface Module { id: string; title: string; subjectId?: string | null; lessonCount: number; lessons: CurriculumLesson[] }
+interface SubjectInfo { id: string; title: string; description: string | null; position: number }
 interface Detail {
   course: { id: string; title: string; summary: string | null; descriptionMd: string | null; introPdfR2Key: string | null; level: string | null; durationDays: number | null; price: number; discountPrice: number | null };
   category: { name: string } | null;
   trainer: { name: string } | null;
+  subjects?: SubjectInfo[];
   curriculum: Module[];
 }
 
@@ -57,7 +59,7 @@ export default function CourseDetail() {
   }, [slug]);
 
   const totals = useMemo(() => {
-    if (!data) return { modules: 0, lessons: 0, byType: {} as Record<string, number> };
+    if (!data) return { subjects: 0, modules: 0, lessons: 0, byType: {} as Record<string, number> };
     const byType: Record<string, number> = {};
     let lessons = 0;
     for (const m of data.curriculum) {
@@ -67,7 +69,20 @@ export default function CourseDetail() {
         byType[k] = (byType[k] || 0) + 1;
       }
     }
-    return { modules: data.curriculum.length, lessons, byType };
+    return { subjects: data.subjects?.length ?? 0, modules: data.curriculum.length, lessons, byType };
+  }, [data]);
+
+  // Curriculum grouped by subject (Course → Subject → Module → Lesson). Courses
+  // without subjects render the flat module accordion as before.
+  const subjectGroups = useMemo(() => {
+    const subs = data?.subjects ?? [];
+    if (!data || subs.length === 0) return null;
+    const groups = subs
+      .map((s) => ({ id: s.id, title: s.title, modules: data.curriculum.filter((m) => m.subjectId === s.id) }))
+      .filter((g) => g.modules.length > 0);
+    const general = data.curriculum.filter((m) => !m.subjectId || !subs.some((s) => s.id === m.subjectId));
+    if (general.length) groups.push({ id: "__general", title: "General", modules: general });
+    return groups;
   }, [data]);
 
   if (!data) {
@@ -241,69 +256,83 @@ export default function CourseDetail() {
               aside={
                 totals.lessons > 0 ? (
                   <span className="text-sm font-medium text-muted">
+                    {totals.subjects > 0 && <>{totals.subjects} {totals.subjects === 1 ? "subject" : "subjects"} · </>}
                     {totals.modules} {totals.modules === 1 ? "module" : "modules"} · {totals.lessons} {totals.lessons === 1 ? "lesson" : "lessons"}
                   </span>
                 ) : undefined
               }
             >
-              {data.curriculum.length === 0 ? (
-                <p className="text-sm text-muted">Curriculum coming soon.</p>
-              ) : (
-                <div className="space-y-3">
-                  {data.curriculum.map((m, idx) => {
-                    const isOpen = !!open[m.id];
-                    const count = m.lessons.length || m.lessonCount;
-                    return (
-                      <div key={m.id} className="overflow-hidden rounded-xl border border-border">
-                        <button
-                          onClick={() => toggle(m.id)}
-                          aria-expanded={isOpen}
-                          className="flex w-full items-center justify-between gap-3 bg-canvas px-4 py-3.5 text-left transition hover:bg-brand-50"
-                        >
-                          <span className="flex min-w-0 items-center gap-3">
-                            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand-100 text-xs font-bold text-brand-700">
-                              {String(idx + 1).padStart(2, "0")}
-                            </span>
-                            <span className="truncate font-semibold text-ink">{m.title}</span>
+              {(() => {
+                const moduleBlock = (m: Module, idx: number) => {
+                  const isOpen = !!open[m.id];
+                  const count = m.lessons.length || m.lessonCount;
+                  return (
+                    <div key={m.id} className="overflow-hidden rounded-xl border border-border">
+                      <button
+                        onClick={() => toggle(m.id)}
+                        aria-expanded={isOpen}
+                        className="flex w-full items-center justify-between gap-3 bg-canvas px-4 py-3.5 text-left transition hover:bg-brand-50"
+                      >
+                        <span className="flex min-w-0 items-center gap-3">
+                          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand-100 text-xs font-bold text-brand-700">
+                            {String(idx + 1).padStart(2, "0")}
                           </span>
-                          <span className="flex shrink-0 items-center gap-3">
-                            <span className="text-xs font-medium text-muted">{count} {count === 1 ? "lesson" : "lessons"}</span>
-                            <ChevronDown size={18} className={cn("text-muted transition-transform duration-200", isOpen && "rotate-180")} />
-                          </span>
-                        </button>
-                        <div className={cn("grid transition-all duration-200", isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
-                          <div className="overflow-hidden">
-                            <ul className="divide-y divide-divider border-t border-border bg-white">
-                              {m.lessons.map((l, i) => {
-                                const { Icon, label } = lessonMeta(l.type);
-                                return (
-                                  <li key={i} className="flex items-center justify-between gap-3 px-4 py-3">
-                                    <span className="flex min-w-0 items-center gap-3">
-                                      <Icon size={17} className="shrink-0 text-brand-500" />
-                                      <span className="truncate text-sm text-ink">{l.title}</span>
-                                      <span className="hidden shrink-0 text-xs text-faint sm:inline">{label}</span>
+                          <span className="truncate font-semibold text-ink">{m.title}</span>
+                        </span>
+                        <span className="flex shrink-0 items-center gap-3">
+                          <span className="text-xs font-medium text-muted">{count} {count === 1 ? "lesson" : "lessons"}</span>
+                          <ChevronDown size={18} className={cn("text-muted transition-transform duration-200", isOpen && "rotate-180")} />
+                        </span>
+                      </button>
+                      <div className={cn("grid transition-all duration-200", isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
+                        <div className="overflow-hidden">
+                          <ul className="divide-y divide-divider border-t border-border bg-white">
+                            {m.lessons.map((l, i) => {
+                              const { Icon, label } = lessonMeta(l.type);
+                              return (
+                                <li key={i} className="flex items-center justify-between gap-3 px-4 py-3">
+                                  <span className="flex min-w-0 items-center gap-3">
+                                    <Icon size={17} className="shrink-0 text-brand-500" />
+                                    <span className="truncate text-sm text-ink">{l.title}</span>
+                                    <span className="hidden shrink-0 text-xs text-faint sm:inline">{label}</span>
+                                  </span>
+                                  {l.isFreePreview ? (
+                                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-100">
+                                      <PlayCircle size={12} /> Free preview
                                     </span>
-                                    {l.isFreePreview ? (
-                                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-100">
-                                        <PlayCircle size={12} /> Free preview
-                                      </span>
-                                    ) : (
-                                      <Lock size={14} className="shrink-0 text-faint" />
-                                    )}
-                                  </li>
-                                );
-                              })}
-                              {m.lessons.length === 0 && (
-                                <li className="px-4 py-3 text-sm text-muted">Lessons coming soon.</li>
-                              )}
-                            </ul>
-                          </div>
+                                  ) : (
+                                    <Lock size={14} className="shrink-0 text-faint" />
+                                  )}
+                                </li>
+                              );
+                            })}
+                            {m.lessons.length === 0 && (
+                              <li className="px-4 py-3 text-sm text-muted">Lessons coming soon.</li>
+                            )}
+                          </ul>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                    </div>
+                  );
+                };
+
+                if (data.curriculum.length === 0) return <p className="text-sm text-muted">Curriculum coming soon.</p>;
+                if (!subjectGroups) return <div className="space-y-3">{data.curriculum.map(moduleBlock)}</div>;
+                return (
+                  <div className="space-y-6">
+                    {subjectGroups.map((g) => (
+                      <div key={g.id}>
+                        <div className="mb-2.5 flex items-center gap-2">
+                          <BookOpen size={16} className="text-brand-600" />
+                          <h3 className="font-bold text-ink">{g.title}</h3>
+                          <span className="text-xs font-medium text-muted">{g.modules.length} {g.modules.length === 1 ? "module" : "modules"}</span>
+                        </div>
+                        <div className="space-y-3">{g.modules.map(moduleBlock)}</div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </SectionCard>
 
             {/* Instructor */}

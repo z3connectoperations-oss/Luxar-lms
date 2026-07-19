@@ -7,9 +7,10 @@ import TestsManager from "../../components/TestsManager";
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:8787";
 
 interface Lesson { id: string; title: string; type: string; r2Key: string | null; streamVideoId: string | null; downloadable: boolean }
-interface Module { id: string; title: string; lessons: Lesson[] }
+interface Module { id: string; title: string; subjectId?: string | null; lessons: Lesson[] }
+interface Subject { id: string; title: string; position: number }
 interface Material { id: string; title: string; kind: string }
-interface Data { course: { id: string; title: string; status: string }; modules: Module[]; materials: Material[] }
+interface Data { course: { id: string; title: string; status: string }; subjects?: Subject[]; modules: Module[]; materials: Material[] }
 
 async function uploadFile(file: File, folder: string): Promise<string> {
   const res = await fetch(`${BASE}/trainer/upload?folder=${folder}&filename=${encodeURIComponent(file.name)}`, {
@@ -40,31 +41,62 @@ export default function CourseManage() {
         <Link to={`/trainer/courses/${id}/live`} target="_blank" rel="noopener noreferrer"><Button>🔴 Live class</Button></Link>
       </div>
 
-      <ModulesPanel courseId={id!} modules={data.modules} reload={load} />
+      <ModulesPanel courseId={id!} modules={data.modules} subjects={data.subjects || []} reload={load} />
       <MaterialsPanel courseId={id!} materials={data.materials} reload={load} />
       <TestsManager courseId={id!} />
     </div>
   );
 }
 
-function ModulesPanel({ courseId, modules, reload }: { courseId: string; modules: Module[]; reload: () => void }) {
+// Curriculum grouped by subject (Course → Subject → Module → Lesson). Courses
+// without subjects keep the flat module list; new modules can be filed under a
+// subject via the picker next to the add-module input.
+function ModulesPanel({ courseId, modules, subjects, reload }: { courseId: string; modules: Module[]; subjects: Subject[]; reload: () => void }) {
   const [title, setTitle] = useState("");
-  const addModule = async () => { if (!title.trim()) return; await api(`/trainer/courses/${courseId}/modules`, { method: "POST", body: JSON.stringify({ title, position: modules.length }) }); setTitle(""); reload(); };
+  const [subjectId, setSubjectId] = useState("");
+  const addModule = async () => { if (!title.trim()) return; await api(`/trainer/courses/${courseId}/modules`, { method: "POST", body: JSON.stringify({ title, position: modules.length, subjectId: subjectId || null }) }); setTitle(""); reload(); };
   const delModule = async (mid: string) => { await api(`/trainer/modules/${mid}`, { method: "DELETE" }); reload(); };
+
+  const moduleRow = (m: Module) => (
+    <div key={m.id} className="mb-3 rounded-lg border border-border p-3">
+      <div className="flex items-center justify-between">
+        <span className="font-semibold text-ink">{m.title}</span>
+        <button className="text-xs text-accent-pink" onClick={() => delModule(m.id)}>Delete module</button>
+      </div>
+      <LessonEditor module={m} reload={reload} />
+    </div>
+  );
+
+  const groups = subjects.length
+    ? [
+        ...subjects
+          .map((s) => ({ id: s.id, title: s.title, modules: modules.filter((m) => m.subjectId === s.id) }))
+          .filter((g) => g.modules.length > 0),
+        ...(modules.some((m) => !m.subjectId || !subjects.some((s) => s.id === m.subjectId))
+          ? [{ id: "__general", title: "General", modules: modules.filter((m) => !m.subjectId || !subjects.some((s) => s.id === m.subjectId)) }]
+          : []),
+      ]
+    : null;
+
   return (
     <Card>
-      <h2 className="mb-3 font-semibold text-ink">Curriculum — modules, lessons & videos</h2>
-      {modules.map((m) => (
-        <div key={m.id} className="mb-3 rounded-lg border border-border p-3">
-          <div className="flex items-center justify-between">
-            <span className="font-semibold text-ink">{m.title}</span>
-            <button className="text-xs text-accent-pink" onClick={() => delModule(m.id)}>Delete module</button>
-          </div>
-          <LessonEditor module={m} reload={reload} />
-        </div>
-      ))}
-      <div className="flex gap-2">
-        <Input placeholder="New module title" value={title} onChange={(e) => setTitle(e.target.value)} />
+      <h2 className="mb-3 font-semibold text-ink">Curriculum — {subjects.length ? "subjects, " : ""}modules, lessons & videos</h2>
+      {groups
+        ? groups.map((g) => (
+            <div key={g.id} className="mb-4">
+              <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-muted">{g.title}</div>
+              {g.modules.map(moduleRow)}
+            </div>
+          ))
+        : modules.map(moduleRow)}
+      <div className="flex flex-wrap gap-2">
+        <Input className="min-w-[12rem] flex-1" placeholder="New module title" value={title} onChange={(e) => setTitle(e.target.value)} />
+        {subjects.length > 0 && (
+          <Select className="w-44" value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
+            <option value="">Subject: none</option>
+            {subjects.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
+          </Select>
+        )}
         <Button variant="outline" onClick={addModule}>Add module</Button>
       </div>
     </Card>

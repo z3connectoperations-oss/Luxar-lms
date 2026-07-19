@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { eq, and, inArray, desc } from "drizzle-orm";
-import { enrollments, courses, modules, lessons, lessonProgress, courseTrainers, forumThreads, forumPosts, users, notifications, tests, questions, testAttempts, attemptAnswers, descriptiveSubmissions, mockTests, mockQuestions, mockAttempts, mockAttemptAnswers } from "@luxar/db";
+import { enrollments, courses, modules, lessons, lessonProgress, courseTrainers, forumThreads, forumPosts, users, notifications, tests, questions, testAttempts, attemptAnswers, descriptiveSubmissions, mockTests, mockQuestions, mockAttempts, mockAttemptAnswers, subjects } from "@luxar/db";
 import { requireAuth } from "../middleware";
 import { createNotification } from "../notify";
 import type { AppEnv } from "../types";
@@ -48,9 +48,11 @@ learn.get("/courses/:courseId", async (c) => {
   if (!course) return c.json({ error: "not found" }, 404);
 
   const mods = await db.select().from(modules).where(eq(modules.courseId, courseId)).orderBy(modules.position).all();
+  const subs = await db.select().from(subjects).where(eq(subjects.courseId, courseId)).orderBy(subjects.position).all();
   const modIds = mods.map((m) => m.id);
-  const allLessons = modIds.length ? await db.select().from(lessons).orderBy(lessons.position).all() : [];
-  const courseLessons = allLessons.filter((l) => modIds.includes(l.moduleId));
+  const courseLessons = modIds.length
+    ? await db.select().from(lessons).where(inArray(lessons.moduleId, modIds)).orderBy(lessons.position).all()
+    : [];
 
   const progress = await db.select().from(lessonProgress).where(eq(lessonProgress.userId, user.id)).all();
   const progressOf = (lid: string) => progress.find((p) => p.lessonId === lid);
@@ -64,6 +66,7 @@ learn.get("/courses/:courseId", async (c) => {
   const curriculum = mods.map((m) => ({
     id: m.id,
     title: m.title,
+    subjectId: m.subjectId ?? null,
     lessons: courseLessons
       .filter((l) => l.moduleId === m.id)
       .map((l) => ({
@@ -91,6 +94,7 @@ learn.get("/courses/:courseId", async (c) => {
 
   return c.json({
     course: { id: course.id, title: course.title, thumbnailR2Key: course.thumbnailR2Key },
+    subjects: subs.map((s) => ({ id: s.id, title: s.title, position: s.position })),
     curriculum,
     progressPct,
     totalLessons: total,

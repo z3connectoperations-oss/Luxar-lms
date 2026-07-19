@@ -6,9 +6,11 @@ import { mediaUrl } from "../../lib/media";
 import { Card, Button, Progress } from "../../components/ui";
 
 interface Lesson { id: string; title: string; type: string; completed: boolean }
-interface Module { id: string; title: string; lessons: Lesson[] }
+interface Module { id: string; title: string; subjectId?: string | null; lessons: Lesson[] }
+interface SubjectInfo { id: string; title: string; position: number }
 interface PlayerData {
   course: { id: string; title: string; thumbnailR2Key: string | null };
+  subjects?: SubjectInfo[];
   curriculum: Module[];
   progressPct: number;
   totalLessons: number;
@@ -59,11 +61,9 @@ export default function Pathway() {
         <Button onClick={openPlayer} className="shrink-0"><ExternalLink size={16} /> Open course</Button>
       </Card>
 
-      {/* Module tracker */}
-      <div className="space-y-3">
-        <h2 className="text-sm font-bold uppercase tracking-wide text-muted">Modules</h2>
-        {curriculum.length === 0 && <Card className="text-sm text-muted">No modules yet.</Card>}
-        {curriculum.map((m, i) => {
+      {/* Module tracker — grouped by subject when the course has subjects */}
+      {(() => {
+        const moduleCard = (m: Module, i: number) => {
           const total = m.lessons.length;
           const done = m.lessons.filter((l) => l.completed).length;
           const pct = total ? Math.round((done / total) * 100) : 0;
@@ -99,8 +99,42 @@ export default function Pathway() {
               </div>
             </Card>
           );
-        })}
-      </div>
+        };
+
+        const subs = data.subjects ?? [];
+        if (subs.length === 0) {
+          return (
+            <div className="space-y-3">
+              <h2 className="text-sm font-bold uppercase tracking-wide text-muted">Modules</h2>
+              {curriculum.length === 0 && <Card className="text-sm text-muted">No modules yet.</Card>}
+              {curriculum.map(moduleCard)}
+            </div>
+          );
+        }
+        const groups = subs
+          .map((s) => ({ id: s.id, title: s.title, modules: curriculum.filter((m) => m.subjectId === s.id) }))
+          .filter((g) => g.modules.length > 0);
+        const general = curriculum.filter((m) => !m.subjectId || !subs.some((s) => s.id === m.subjectId));
+        if (general.length) groups.push({ id: "__general", title: "General", modules: general });
+        return (
+          <div className="space-y-5">
+            {groups.map((g) => {
+              const gl = g.modules.flatMap((m) => m.lessons);
+              const gDone = gl.filter((l) => l.completed).length;
+              const gPct = gl.length ? Math.round((gDone / gl.length) * 100) : 0;
+              return (
+                <div key={g.id} className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 className="text-sm font-bold uppercase tracking-wide text-muted">{g.title}</h2>
+                    <span className="text-xs font-semibold text-muted">{gPct}%</span>
+                  </div>
+                  {g.modules.map(moduleCard)}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* Live classes */}
       <LiveClasses courseId={courseId!} />

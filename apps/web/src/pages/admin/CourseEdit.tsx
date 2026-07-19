@@ -10,12 +10,14 @@ import CourseMockTests from "./CourseMockTestsTab";
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:8787";
 
 interface Lesson { id: string; title: string; type: string; status: string; r2Key: string | null; isFreePreview?: boolean }
-interface Module { id: string; title: string; lessons: Lesson[] }
+interface Module { id: string; title: string; subjectId?: string | null; lessons: Lesson[] }
+interface Subject { id: string; title: string; description: string | null; position: number; status: string }
 interface ChildCourse { id: string; title: string; slug: string; status: string; thumbnailR2Key: string | null }
 interface PackagedTS { id: string; title: string; slug: string; status: string }
 interface CourseData {
   course: any;
   modules: Module[];
+  subjects?: Subject[];
   children?: ChildCourse[];
   packagedTestSeries?: PackagedTS[];
 }
@@ -244,8 +246,8 @@ export default function CourseEdit() {
         </div>
       )}
 
-      {/* CURRICULUM */}
-      {tab === "curriculum" && !isPackage && <Modules courseId={id!} modules={data.modules} reload={load} />}
+      {/* CURRICULUM — Subject → Module → Lesson */}
+      {tab === "curriculum" && !isPackage && <Curriculum courseId={id!} modules={data.modules} subjects={data.subjects || []} reload={load} />}
 
       {/* MOCK TESTS */}
       {tab === "mock_tests" && !isPackage && <CourseMockTests courseId={id!} />}
@@ -394,25 +396,158 @@ function SubCourses({ packageId, children, reload }: { packageId: string; childr
 interface LiveSess { id: string; moduleId: string | null; title: string; status: string; scheduledStart: string | null; recordingUrl: string | null }
 const fmtDT = (iso: string | null) => (iso ? new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "—");
 
-function Modules({ courseId, modules, reload }: { courseId: string; modules: Module[]; reload: () => void }) {
+// Curriculum tab: Course → Subject → Module → Lesson.
+// Subjects are collapsible sections; one expands at a time (remembered per
+// course). Modules that pre-date subjects appear under "Ungrouped modules" and
+// can be moved into a subject at any time — nothing is lost by reorganising.
+function Curriculum({ courseId, modules, subjects, reload }: { courseId: string; modules: Module[]; subjects: Subject[]; reload: () => void }) {
+  const storeKey = `luxar_admin_subject_${courseId}`;
+  const [expanded, setExpanded] = useState<string | null>(() => { try { return localStorage.getItem(storeKey); } catch { return null; } });
+  const [newTitle, setNewTitle] = useState("");
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const toggle = (sid: string) => {
+    const next = expanded === sid ? null : sid;
+    setExpanded(next);
+    try { next ? localStorage.setItem(storeKey, next) : localStorage.removeItem(storeKey); } catch { /* ignore */ }
+  };
+
+  const addSubject = async () => {
+    if (!newTitle.trim()) return;
+    setBusy(true);
+    try {
+      const { id } = await api<{ id: string }>(`/admin/courses/${courseId}/subjects`, { method: "POST", body: JSON.stringify({ title: newTitle.trim(), position: subjects.length }) });
+      setNewTitle("");
+      setExpanded(id);
+      reload();
+    } finally { setBusy(false); }
+  };
+  const saveSubject = async (id: string) => {
+    if (!editTitle.trim()) return;
+    await api(`/admin/subjects/${id}`, { method: "PATCH", body: JSON.stringify({ title: editTitle.trim() }) });
+    setEditId(null);
+    reload();
+  };
+  const delSubject = async (s: Subject) => {
+    if (!window.confirm(`Delete subject "${s.title}"?\n\nIts modules are NOT deleted — they move to "Ungrouped modules".`)) return;
+    await api(`/admin/subjects/${s.id}`, { method: "DELETE" });
+    reload();
+  };
+  // Reorder by writing index-based positions for the whole list (small N).
+  const move = async (idx: number, dir: -1 | 1) => {
+    const next = [...subjects];
+    const [s] = next.splice(idx, 1);
+    next.splice(idx + dir, 0, s);
+    await Promise.all(next.map((sub, i) => sub.position !== i ? api(`/admin/subjects/${sub.id}`, { method: "PATCH", body: JSON.stringify({ position: i }) }) : null));
+    reload();
+  };
+
+  const ungrouped = modules.filter((m) => !m.subjectId);
+  const modCount = (sid: string) => modules.filter((m) => m.subjectId === sid).length;
+
+  // Legacy view — no subjects yet: exactly the old flat module editor.
+  if (subjects.length === 0) {
+    return (
+      <div className="space-y-4">
+        <Card>
+          <div className="mb-2 flex items-baseline justify-between gap-2">
+            <h2 className="font-semibold text-ink">Subjects</h2>
+            <span className="text-xs text-muted">e.g. Aptitude, Reasoning, General English</span>
+          </div>
+          <p className="mb-3 text-xs text-muted">Organise this course by subject. Create subjects first, then add modules inside each — or keep using the flat module list below.</p>
+          <div className="flex gap-2">
+            <Input placeholder="New subject title (e.g. Aptitude)" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addSubject()} />
+            <Button variant="outline" onClick={addSubject} disabled={busy || !newTitle.trim()}>+ Add subject</Button>
+          </div>
+        </Card>
+        <Modules courseId={courseId} modules={modules} reload={reload} subjects={subjects} title="Curriculum (modules & lessons)" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <div className="mb-3 flex items-baseline justify-between gap-2">
+          <h2 className="font-semibold text-ink">Subjects</h2>
+          <span className="text-xs text-muted">{subjects.length} subject{subjects.length === 1 ? "" : "s"} · {modules.length} module{modules.length === 1 ? "" : "s"}</span>
+        </div>
+
+        <div className="space-y-2">
+          {subjects.map((s, idx) => (
+            <div key={s.id} className="overflow-hidden rounded-lg border border-border">
+              <div className={cn("flex items-center justify-between gap-2 px-3 py-2.5", expanded === s.id ? "bg-brand-50/60" : "bg-canvas/50")}>
+                {editId === s.id ? (
+                  <div className="flex flex-1 items-center gap-2">
+                    <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} autoFocus onKeyDown={(e) => e.key === "Enter" && saveSubject(s.id)} />
+                    <Button size="sm" onClick={() => saveSubject(s.id)} disabled={!editTitle.trim()}>Save</Button>
+                    <button className="text-xs text-muted hover:underline" onClick={() => setEditId(null)}>Cancel</button>
+                  </div>
+                ) : (
+                  <>
+                    <button className="flex min-w-0 flex-1 items-center gap-2 text-left" onClick={() => toggle(s.id)}>
+                      <span className={cn("text-xs transition-transform", expanded === s.id && "rotate-90")}>▶</span>
+                      <span className="truncate font-semibold text-ink">{s.title}</span>
+                      <span className="shrink-0 text-xs text-muted">{modCount(s.id)} module{modCount(s.id) === 1 ? "" : "s"}</span>
+                    </button>
+                    <div className="flex shrink-0 items-center gap-2.5">
+                      <button className="text-xs text-muted disabled:opacity-30" disabled={idx === 0} onClick={() => move(idx, -1)} title="Move up">↑</button>
+                      <button className="text-xs text-muted disabled:opacity-30" disabled={idx === subjects.length - 1} onClick={() => move(idx, 1)} title="Move down">↓</button>
+                      <button className="text-xs font-semibold text-brand-600 hover:underline" onClick={() => { setEditId(s.id); setEditTitle(s.title); }}>Rename</button>
+                      <button className="text-xs text-accent-pink" onClick={() => delSubject(s)}>Delete</button>
+                    </div>
+                  </>
+                )}
+              </div>
+              {expanded === s.id && (
+                <div className="border-t border-border p-3">
+                  <Modules courseId={courseId} modules={modules.filter((m) => m.subjectId === s.id)} reload={reload} subjectId={s.id} subjects={subjects} embedded />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-3 flex gap-2">
+          <Input placeholder="New subject title (e.g. Reasoning)" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addSubject()} />
+          <Button variant="outline" onClick={addSubject} disabled={busy || !newTitle.trim()}>+ Add subject</Button>
+        </div>
+      </Card>
+
+      {ungrouped.length > 0 && (
+        <Card>
+          <div className="mb-2 flex items-baseline justify-between gap-2">
+            <h2 className="font-semibold text-ink">Ungrouped modules</h2>
+            <span className="text-xs text-muted">Assign each to a subject with the “Subject” dropdown</span>
+          </div>
+          <Modules courseId={courseId} modules={ungrouped} reload={reload} subjects={subjects} embedded />
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// The module editor (modules + lessons + live classes). Used standalone (legacy
+// flat view) or embedded inside a subject; new modules inherit `subjectId`.
+function Modules({ courseId, modules, reload, subjectId, subjects = [], embedded, title: cardTitle }: { courseId: string; modules: Module[]; reload: () => void; subjectId?: string | null; subjects?: Subject[]; embedded?: boolean; title?: string }) {
   const [title, setTitle] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [live, setLive] = useState<LiveSess[]>([]);
   const loadLive = useCallback(() => { api<{ sessions: LiveSess[] }>(`/trainer/courses/${courseId}/live`).then((d) => setLive(d.sessions)).catch(() => setLive([])); }, [courseId]);
   useEffect(() => { loadLive(); }, [loadLive]);
-  const addModule = async () => { if (!title.trim()) return; await api(`/admin/courses/${courseId}/modules`, { method: "POST", body: JSON.stringify({ title, position: modules.length }) }); setTitle(""); reload(); };
+  const addModule = async () => { if (!title.trim()) return; await api(`/admin/courses/${courseId}/modules`, { method: "POST", body: JSON.stringify({ title, position: modules.length, subjectId: subjectId || null }) }); setTitle(""); reload(); };
   const delModule = async (id: string) => { if (!window.confirm("Delete this module and all its lessons?")) return; await api(`/admin/modules/${id}`, { method: "DELETE" }); reload(); };
   const saveModule = async (id: string) => { if (!editTitle.trim()) return; await api(`/admin/modules/${id}`, { method: "PATCH", body: JSON.stringify({ title: editTitle.trim() }) }); setEditId(null); reload(); };
-  return (
-    <Card>
-      <div className="mb-3 flex items-baseline justify-between gap-2">
-        <h2 className="font-semibold text-ink">Curriculum (modules & lessons)</h2>
-        <span className="text-xs text-muted">Saved automatically when added</span>
-      </div>
+  const moveToSubject = async (id: string, sid: string) => { await api(`/admin/modules/${id}`, { method: "PATCH", body: JSON.stringify({ subjectId: sid || null }) }); reload(); };
+
+  const body = (
+    <>
       {modules.map((m) => (
         <div key={m.id} className="mb-3 rounded-lg border border-border p-3">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             {editId === m.id ? (
               <div className="flex flex-1 items-center gap-2">
                 <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} autoFocus />
@@ -423,6 +558,15 @@ function Modules({ courseId, modules, reload }: { courseId: string; modules: Mod
               <>
                 <span className="font-semibold text-ink">{m.title}</span>
                 <div className="flex items-center gap-3">
+                  {subjects.length > 0 && (
+                    <label className="flex items-center gap-1 text-xs text-muted">
+                      Subject
+                      <Select className="h-7 w-36 text-xs" value={m.subjectId || ""} onChange={(e) => moveToSubject(m.id, e.target.value)}>
+                        <option value="">— none —</option>
+                        {subjects.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
+                      </Select>
+                    </label>
+                  )}
                   <button className="text-xs font-semibold text-brand-600 hover:underline" onClick={() => { setEditId(m.id); setEditTitle(m.title); }}>Edit</button>
                   <button className="text-xs text-accent-pink" onClick={() => delModule(m.id)}>Delete module</button>
                 </div>
@@ -434,9 +578,20 @@ function Modules({ courseId, modules, reload }: { courseId: string; modules: Mod
         </div>
       ))}
       <div className="flex gap-2">
-        <Input placeholder="New module title" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <Input placeholder="New module title" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addModule()} />
         <Button variant="outline" onClick={addModule}>Add module</Button>
       </div>
+    </>
+  );
+
+  if (embedded) return <div>{body}</div>;
+  return (
+    <Card>
+      <div className="mb-3 flex items-baseline justify-between gap-2">
+        <h2 className="font-semibold text-ink">{cardTitle || "Curriculum (modules & lessons)"}</h2>
+        <span className="text-xs text-muted">Saved automatically when added</span>
+      </div>
+      {body}
     </Card>
   );
 }

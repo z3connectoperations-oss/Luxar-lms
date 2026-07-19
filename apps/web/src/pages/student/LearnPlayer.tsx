@@ -12,9 +12,11 @@ interface Lesson {
   hasFile: boolean; externalVideoUrl: string | null; completed: boolean; unlocked: boolean;
   lastPositionSec: number; watchedSec: number;
 }
-interface Module { id: string; title: string; lessons: Lesson[] }
+interface Module { id: string; title: string; subjectId?: string | null; lessons: Lesson[] }
+interface SubjectInfo { id: string; title: string; position: number }
 interface PlayerData {
   course: { id: string; title: string };
+  subjects?: SubjectInfo[];
   curriculum: Module[];
   progressPct: number; totalLessons: number; completedLessons: number;
 }
@@ -51,6 +53,43 @@ export default function LearnPlayer() {
 
   const flat = useMemo(() => data?.curriculum.flatMap((m) => m.lessons) ?? [], [data]);
   const active = useMemo(() => flat.find((l) => l.id === activeId), [flat, activeId]);
+
+  // Group modules under subjects (Course → Subject → Module → Lesson). Courses
+  // without subjects keep the legacy flat module list. Ungrouped modules land in
+  // a trailing "General" section so nothing disappears.
+  const groups = useMemo(() => {
+    const subs = data?.subjects ?? [];
+    if (!data || subs.length === 0) return null;
+    const grouped = subs
+      .map((s) => ({ id: s.id, title: s.title, modules: data.curriculum.filter((m) => m.subjectId === s.id) }))
+      .filter((g) => g.modules.length > 0);
+    const general = data.curriculum.filter((m) => !m.subjectId || !subs.some((s) => s.id === m.subjectId));
+    if (general.length) grouped.push({ id: "__general", title: "General", modules: general });
+    return grouped;
+  }, [data]);
+
+  // One subject expands at a time; remember the learner's last section.
+  const subjectStoreKey = `luxar_lp_subject_${courseId}`;
+  const [openSubject, setOpenSubject] = useState<string | null>(() => { try { return localStorage.getItem(subjectStoreKey); } catch { return null; } });
+  const toggleSubject = (sid: string) => {
+    const next = openSubject === sid ? null : sid;
+    setOpenSubject(next);
+    try { next ? localStorage.setItem(subjectStoreKey, next) : localStorage.removeItem(subjectStoreKey); } catch { /* ignore */ }
+  };
+  // Default to the subject holding the active lesson (or the first section).
+  useEffect(() => {
+    if (!groups) return;
+    if (openSubject && groups.some((g) => g.id === openSubject)) return;
+    const holder = groups.find((g) => g.modules.some((m) => m.lessons.some((l) => l.id === activeId))) || groups[0];
+    if (holder) setOpenSubject(holder.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groups, activeId]);
+
+  const activeModule = useMemo(() => data?.curriculum.find((m) => m.lessons.some((l) => l.id === activeId)) ?? null, [data, activeId]);
+  const activeSubject = useMemo(() => {
+    if (!activeModule?.subjectId) return null;
+    return (data?.subjects ?? []).find((s) => s.id === activeModule.subjectId) ?? null;
+  }, [data, activeModule]);
 
   // Content protection: turn the screen solid black during capture attempts
   // (Print-Screen key, window losing focus / tab hidden) and blank the page on print.
@@ -109,58 +148,81 @@ export default function LearnPlayer() {
         </div>
       </header>
 
+      {(() => {
+        const renderModule = (m: Module) => (
+          <div key={m.id} className="py-1">
+            <div className="px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-muted">{m.title}</div>
+            {liveByModule(m.id).map((s) => (
+              s.status === "live" ? (
+                <a
+                  key={s.id}
+                  href={`/student/courses/${courseId}/live`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mx-2 my-1 flex items-center gap-2 rounded-lg bg-rose-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-rose-700"
+                >
+                  <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-white" />
+                  <span className="flex-1 truncate">LIVE NOW — Join “{s.title}”</span>
+                </a>
+              ) : (
+                <div key={s.id} className="mx-2 my-1 flex items-center gap-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-1.5 text-[11px] font-semibold text-amber-800">
+                  <span className="shrink-0">⏰</span>
+                  <span className="flex-1 truncate">{s.title} · {fmtTime(s.scheduledStart)}</span>
+                </div>
+              )
+            ))}
+            {m.lessons.map((l) => {
+              const isActive = l.id === activeId;
+              return (
+                <button
+                  key={l.id}
+                  disabled={!l.unlocked}
+                  onClick={() => l.unlocked && setActiveId(l.id)}
+                  className={cn(
+                    "flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm transition",
+                    isActive ? "bg-brand-50 font-semibold text-brand-700" : "text-ink hover:bg-canvas",
+                    !l.unlocked && "cursor-not-allowed text-faint hover:bg-transparent"
+                  )}
+                >
+                  <span className="shrink-0">
+                    {l.completed ? <CheckCircle2 size={16} className="text-emerald-600" />
+                      : !l.unlocked ? <Lock size={15} className="text-faint" />
+                      : l.type === "video" ? <PlayCircle size={16} className="text-brand-500" />
+                      : <FileText size={16} className="text-brand-500" />}
+                  </span>
+                  <span className="flex-1 truncate">{l.title}</span>
+                  <span className="shrink-0 text-[11px] text-faint">{l.type}</span>
+                </button>
+              );
+            })}
+          </div>
+        );
+
+        return (
       <div className="grid min-h-0 flex-1 grid-cols-[300px_1fr]">
-        {/* Table of contents */}
+        {/* Table of contents — Subject → Module → Lesson */}
         <aside className="flex flex-col overflow-y-auto border-r border-border bg-white">
           <div className="border-b border-border px-4 py-3 text-sm font-bold text-ink">Table of Content</div>
-          {data.curriculum.map((m) => (
-            <div key={m.id} className="py-1">
-              <div className="px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-muted">{m.title}</div>
-              {liveByModule(m.id).map((s) => (
-                s.status === "live" ? (
-                  <a
-                    key={s.id}
-                    href={`/student/courses/${courseId}/live`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mx-2 my-1 flex items-center gap-2 rounded-lg bg-rose-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-rose-700"
-                  >
-                    <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-white" />
-                    <span className="flex-1 truncate">LIVE NOW — Join “{s.title}”</span>
-                  </a>
-                ) : (
-                  <div key={s.id} className="mx-2 my-1 flex items-center gap-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-1.5 text-[11px] font-semibold text-amber-800">
-                    <span className="shrink-0">⏰</span>
-                    <span className="flex-1 truncate">{s.title} · {fmtTime(s.scheduledStart)}</span>
-                  </div>
-                )
-              ))}
-              {m.lessons.map((l) => {
-                const isActive = l.id === activeId;
+          {groups
+            ? groups.map((g) => {
+                const gLessons = g.modules.flatMap((m) => m.lessons);
+                const gDone = gLessons.filter((l) => l.completed).length;
+                const isOpen = openSubject === g.id;
                 return (
-                  <button
-                    key={l.id}
-                    disabled={!l.unlocked}
-                    onClick={() => l.unlocked && setActiveId(l.id)}
-                    className={cn(
-                      "flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm transition",
-                      isActive ? "bg-brand-50 font-semibold text-brand-700" : "text-ink hover:bg-canvas",
-                      !l.unlocked && "cursor-not-allowed text-faint hover:bg-transparent"
-                    )}
-                  >
-                    <span className="shrink-0">
-                      {l.completed ? <CheckCircle2 size={16} className="text-emerald-600" />
-                        : !l.unlocked ? <Lock size={15} className="text-faint" />
-                        : l.type === "video" ? <PlayCircle size={16} className="text-brand-500" />
-                        : <FileText size={16} className="text-brand-500" />}
-                    </span>
-                    <span className="flex-1 truncate">{l.title}</span>
-                    <span className="shrink-0 text-[11px] text-faint">{l.type}</span>
-                  </button>
+                  <div key={g.id} className="border-b border-border/60">
+                    <button
+                      onClick={() => toggleSubject(g.id)}
+                      className={cn("flex w-full items-center gap-2 px-4 py-3 text-left transition", isOpen ? "bg-brand-50/70" : "hover:bg-canvas")}
+                    >
+                      <ChevronRight size={14} className={cn("shrink-0 text-muted transition-transform", isOpen && "rotate-90")} />
+                      <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink">{g.title}</span>
+                      <span className="shrink-0 text-[11px] text-muted">{gDone}/{gLessons.length}</span>
+                    </button>
+                    {isOpen && g.modules.map(renderModule)}
+                  </div>
                 );
-              })}
-            </div>
-          ))}
+              })
+            : data.curriculum.map(renderModule)}
         </aside>
 
         {/* Content */}
@@ -175,10 +237,22 @@ export default function LearnPlayer() {
               </div>
             </div>
           ) : (
-            <LessonStage key={active.id} courseId={courseId!} courseTitle={data.course.title} lesson={active} flat={flat} reload={load} onGoNext={(id) => setActiveId(id)} />
+            <div className="mx-auto max-w-4xl">
+              {/* Breadcrumb: Course › Subject › Module › Lesson */}
+              <nav className="mb-3 flex flex-wrap items-center gap-1 text-xs text-muted">
+                <span className="truncate">{data.course.title}</span>
+                {activeSubject && <><ChevronRight size={12} className="shrink-0" /><span className="truncate">{activeSubject.title}</span></>}
+                {activeModule && <><ChevronRight size={12} className="shrink-0" /><span className="truncate">{activeModule.title}</span></>}
+                <ChevronRight size={12} className="shrink-0" />
+                <span className="truncate font-semibold text-ink">{active.title}</span>
+              </nav>
+              <LessonStage key={active.id} courseId={courseId!} courseTitle={data.course.title} lesson={active} flat={flat} reload={load} onGoNext={(id) => setActiveId(id)} />
+            </div>
           )}
         </main>
       </div>
+        );
+      })()}
     </div>
   );
 }

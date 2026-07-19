@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { eq, and, inArray, desc } from "drizzle-orm";
-import { courses, courseTrainers, modules, lessons, materials, scheduleEvents, forumThreads, users, tests, questions, testAttempts, descriptiveSubmissions, mentorshipSlots, interviewSessions, liveSessions, enrollments } from "@luxar/db";
+import { courses, courseTrainers, modules, lessons, materials, scheduleEvents, forumThreads, users, tests, questions, testAttempts, descriptiveSubmissions, mentorshipSlots, interviewSessions, liveSessions, enrollments, subjects } from "@luxar/db";
 import { requireRole } from "../middleware";
 import { createNotification } from "../notify";
 import type { AppEnv } from "../types";
@@ -52,11 +52,16 @@ trainer.get("/courses/:id", async (c) => {
   const course = await db.select().from(courses).where(eq(courses.id, id)).get();
   if (!course) return c.json({ error: "not found" }, 404);
   const mods = await db.select().from(modules).where(eq(modules.courseId, id)).orderBy(modules.position).all();
-  const allLessons = await db.select().from(lessons).orderBy(lessons.position).all();
+  const modIds = mods.map((m) => m.id);
+  const allLessons = modIds.length
+    ? await db.select().from(lessons).where(inArray(lessons.moduleId, modIds)).orderBy(lessons.position).all()
+    : [];
   const mats = await db.select().from(materials).where(eq(materials.courseId, id)).all();
+  const subs = await db.select().from(subjects).where(eq(subjects.courseId, id)).orderBy(subjects.position).all();
   return c.json({
     course: { id: course.id, title: course.title, status: course.status },
     materials: mats,
+    subjects: subs,
     modules: mods.map((m) => ({ ...m, lessons: allLessons.filter((l) => l.moduleId === m.id) })),
   });
 });
@@ -68,7 +73,7 @@ trainer.post("/courses/:id/modules", async (c) => {
   if (!(await canManage(db, user.id, user.role, c.req.param("id")))) return c.json({ error: "forbidden" }, 403);
   const b = await c.req.json();
   const id = crypto.randomUUID();
-  await db.insert(modules).values({ id, courseId: c.req.param("id"), title: b.title || "Untitled module", position: b.position ?? 0 });
+  await db.insert(modules).values({ id, courseId: c.req.param("id"), subjectId: b.subjectId || null, title: b.title || "Untitled module", position: b.position ?? 0 });
   return c.json({ id });
 });
 trainer.delete("/modules/:id", async (c) => {

@@ -16,6 +16,7 @@ import {
   products,
   testSeries,
   packageTestSeries,
+  subjects,
 } from "@luxar/db";
 import type { AppEnv } from "../types";
 
@@ -79,12 +80,16 @@ site.get("/courses/:slug", async (c) => {
   const trainer = course.trainerId ? await db.select({ name: users.name }).from(users).where(eq(users.id, course.trainerId)).get() : null;
   const variants = await db.select().from(courseVariants).where(eq(courseVariants.courseId, course.id)).all();
   const mods = await db.select().from(modules).where(eq(modules.courseId, course.id)).orderBy(modules.position).all();
-  const allLessons = await db.select().from(lessons).orderBy(lessons.position).all();
+  const modIds = mods.map((m) => m.id);
+  const allLessons = modIds.length
+    ? await db.select().from(lessons).where(inArray(lessons.moduleId, modIds)).orderBy(lessons.position).all()
+    : [];
+  const subs = await db.select().from(subjects).where(eq(subjects.courseId, course.id)).orderBy(subjects.position).all();
 
   const curriculum = mods.map((m) => {
     const ls = allLessons.filter((l) => l.moduleId === m.id);
     return {
-      id: m.id, title: m.title, lessonCount: ls.length,
+      id: m.id, title: m.title, subjectId: m.subjectId ?? null, lessonCount: ls.length,
       lessons: ls.map((l) => ({ title: l.title, type: l.type, isFreePreview: l.isFreePreview })),
     };
   });
@@ -114,6 +119,7 @@ site.get("/courses/:slug", async (c) => {
     category: cat ? { name: cat.name, slug: cat.slug } : null,
     trainer: trainer ? { name: trainer.name } : null,
     variants,
+    subjects: subs.map((s) => ({ id: s.id, title: s.title, description: s.description, position: s.position })),
     curriculum,
     subCourses,
     includedTestSeries,
