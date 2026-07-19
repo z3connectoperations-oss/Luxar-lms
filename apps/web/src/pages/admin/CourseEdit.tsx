@@ -630,7 +630,7 @@ function LessonList({ module, reload }: { module: Module; reload: () => void }) 
 
   return (
     <div className="mt-2 space-y-1">
-      {module.lessons.map((l) => <LessonRow key={l.id} lesson={l} reload={reload} />)}
+      {module.lessons.map((l) => <LessonRow key={l.id} lesson={l} moduleId={module.id} reload={reload} />)}
 
       <div className="mt-2 space-y-2 rounded-lg border border-dashed border-border p-2.5">
         <div className="flex flex-wrap gap-2">
@@ -663,8 +663,9 @@ function LessonList({ module, reload }: { module: Module; reload: () => void }) 
 }
 
 // One lesson row: read-only by default, expands to an inline editor (title, type,
-// free-preview, optional file replacement) when "Edit" is clicked.
-function LessonRow({ lesson, reload }: { lesson: Lesson; reload: () => void }) {
+// free-preview, optional file replacement) when "Edit" is clicked. Quiz lessons
+// link to the module's mock test — that's where their questions are managed.
+function LessonRow({ lesson, moduleId, reload }: { lesson: Lesson; moduleId: string; reload: () => void }) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(lesson.title);
   const [type, setType] = useState(lesson.type);
@@ -704,6 +705,11 @@ function LessonRow({ lesson, reload }: { lesson: Lesson; reload: () => void }) {
           {lesson.isFreePreview && <span className="ml-1 text-xs font-semibold text-muted">· free preview</span>}
         </span>
         <div className="flex items-center gap-3">
+          {lesson.type === "quiz" && (
+            <Link to={`/admin/modules/${moduleId}/mock-test`} className="text-xs font-bold text-gold-600 hover:underline" title="Quiz lessons use the module's mock test — add questions there">
+              Questions →
+            </Link>
+          )}
           <button className="text-xs font-semibold text-brand-600 hover:underline" onClick={() => setEditing(true)}>Edit</button>
           <button className="text-xs text-accent-pink" onClick={del}>Remove</button>
         </div>

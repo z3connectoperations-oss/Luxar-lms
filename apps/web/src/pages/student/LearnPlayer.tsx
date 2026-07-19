@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
-import { CheckCircle2, Lock, PlayCircle, FileText, X, ChevronRight, Download, Trash2, Menu } from "lucide-react";
+import { CheckCircle2, Lock, PlayCircle, FileText, X, ChevronRight, Download, Trash2, Menu, ClipboardCheck } from "lucide-react";
 import { api, lessonFileUrl } from "../../lib/api";
 import { cn } from "../../lib/cn";
 import { isSaved, saveLesson, getOfflineUrl, removeLesson } from "../../lib/offline";
@@ -52,6 +52,12 @@ export default function LearnPlayer() {
     return () => window.clearInterval(t);
   }, [courseId]);
   const liveByModule = (mid: string) => liveSessions.filter((s) => s.moduleId === mid);
+
+  // Module mock tests — quiz lessons open their module's practice test.
+  const [mockTests, setMockTests] = useState<{ id: string; moduleId: string | null; title: string; durationMin?: number }[]>([]);
+  useEffect(() => {
+    api<{ mockTests: any[] }>(`/learn/courses/${courseId}/mock-tests`).then((d) => setMockTests(d.mockTests)).catch(() => {});
+  }, [courseId]);
 
   const flat = useMemo(() => data?.curriculum.flatMap((m) => m.lessons) ?? [], [data]);
   const active = useMemo(() => flat.find((l) => l.id === activeId), [flat, activeId]);
@@ -264,7 +270,16 @@ export default function LearnPlayer() {
                 <ChevronRight size={12} className="shrink-0" />
                 <span className="truncate font-semibold text-ink">{active.title}</span>
               </nav>
-              <LessonStage key={active.id} courseId={courseId!} courseTitle={data.course.title} lesson={active} flat={flat} reload={load} onGoNext={(id) => setActiveId(id)} />
+              <LessonStage
+                key={active.id}
+                courseId={courseId!}
+                courseTitle={data.course.title}
+                lesson={active}
+                flat={flat}
+                practiceTest={activeModule ? mockTests.find((mt) => mt.moduleId === activeModule.id) ?? null : null}
+                reload={load}
+                onGoNext={(id) => setActiveId(id)}
+              />
             </div>
           )}
         </main>
@@ -275,8 +290,10 @@ export default function LearnPlayer() {
   );
 }
 
-function LessonStage({ courseId, courseTitle, lesson, flat, reload, onGoNext }: {
-  courseId: string; courseTitle: string; lesson: Lesson; flat: Lesson[]; reload: () => Promise<void> | void; onGoNext: (id: string) => void;
+function LessonStage({ courseId, courseTitle, lesson, flat, practiceTest, reload, onGoNext }: {
+  courseId: string; courseTitle: string; lesson: Lesson; flat: Lesson[];
+  practiceTest?: { id: string; title: string; durationMin?: number } | null;
+  reload: () => Promise<void> | void; onGoNext: (id: string) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const watchedRef = useRef(lesson.watchedSec || 0);
@@ -388,6 +405,27 @@ function LessonStage({ courseId, courseTitle, lesson, flat, reload, onGoNext }: 
         lesson.hasFile
           ? <iframe title={lesson.title} src={`${fileUrl}#toolbar=0&navpanes=0&scrollbar=0`} className="h-[70vh] w-full rounded-xl border border-border" />
           : <Placeholder text="PDF not uploaded yet." />
+      ) : lesson.type === "quiz" ? (
+        // Quiz lessons run the module's practice (mock) test.
+        practiceTest ? (
+          <div className="grid aspect-video w-full place-items-center rounded-xl border border-border bg-white p-6">
+            <div className="max-w-md text-center">
+              <ClipboardCheck size={40} className="mx-auto mb-3 text-brand-600" />
+              <h2 className="text-lg font-bold text-ink">{practiceTest.title}</h2>
+              <p className="mt-1 text-sm text-muted">
+                Practice test for this module{practiceTest.durationMin ? ` · ${practiceTest.durationMin} min` : ""}. Your attempts and scores are saved.
+              </p>
+              <button
+                onClick={() => window.open(`/student/mock-tests/${practiceTest.id}/intro`, "_blank", "noopener")}
+                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-ink px-6 py-2.5 text-sm font-bold text-white transition-all duration-300 hover:bg-gold-600 hover:text-ink"
+              >
+                <PlayCircle size={17} /> Start practice test
+              </button>
+            </div>
+          </div>
+        ) : (
+          <Placeholder text="Practice questions are being prepared for this module." />
+        )
       ) : (
         <Placeholder text={`${lesson.type} content`} />
       )}
