@@ -1109,32 +1109,56 @@ admin.post("/mock-tests/:id/questions", async (c) => {
 admin.post("/mock-tests/:id/questions/import", async (c) => {
   const db = c.get("db");
   const testId = c.req.param("id");
-  const { questions } = await c.req.json();
-  
+  let body: any;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
+  const questions = body?.questions;
   if (!Array.isArray(questions) || questions.length === 0) {
     return c.json({ error: "Invalid questions payload" }, 400);
   }
+
+  // Ensure the target test exists (a bad testId would otherwise fail obscurely).
+  const test = await db.select().from(mockTests).where(eq(mockTests.id, testId)).get();
+  if (!test) return c.json({ error: "Test not found" }, 404);
 
   // Get current max position
   const existing = await db.select().from(mockQuestions).where(eq(mockQuestions.mockTestId, testId)).orderBy(desc(mockQuestions.position)).get();
   let nextPos = existing ? existing.position + 1 : 0;
 
-  const toInsert = questions.map(q => ({
-    id: crypto.randomUUID(),
-    mockTestId: testId,
-    prompt: q.prompt,
-    optionA: q.optionA,
-    optionB: q.optionB,
-    optionC: q.optionC,
-    optionD: q.optionD,
-    correctAnswer: q.correctAnswer,
-    explanation: q.explanation || null,
-    marks: q.marks ? parseInt(q.marks) : 1,
-    position: nextPos++,
-  }));
+  const str = (v: any) => (v == null ? "" : String(v).trim());
+  const toInsert = questions
+    .map((q: any) => {
+      let correctAnswer = str(q.correctAnswer).toUpperCase().charAt(0);
+      if (!["A", "B", "C", "D"].includes(correctAnswer)) correctAnswer = "A";
+      let marks = parseInt(String(q.marks ?? "1"), 10);
+      if (!Number.isFinite(marks) || marks < 1) marks = 1;
+      return {
+        prompt: str(q.prompt),
+        optionA: str(q.optionA),
+        optionB: str(q.optionB),
+        optionC: str(q.optionC),
+        optionD: str(q.optionD),
+        correctAnswer,
+        explanation: str(q.explanation) || null,
+        marks,
+      };
+    })
+    // A question needs at least a prompt; drop blank/garbage rows.
+    .filter((q) => q.prompt.length > 0)
+    .map((q) => ({ id: crypto.randomUUID(), mockTestId: testId, position: nextPos++, ...q }));
 
-  for (let i = 0; i < toInsert.length; i += 50) {
-    await db.insert(mockQuestions).values(toInsert.slice(i, i + 50));
+  if (toInsert.length === 0) {
+    return c.json({ error: "No valid questions found. Each question needs a prompt/question text." }, 400);
+  }
+
+  // D1 allows at most 100 bound parameters per query. Each row binds ~11 columns,
+  // so insert in chunks of 8 rows (88 params) to stay safely under the limit.
+  const BATCH = 8;
+  for (let i = 0; i < toInsert.length; i += BATCH) {
+    await db.insert(mockQuestions).values(toInsert.slice(i, i + BATCH));
   }
   return c.json({ ok: true, imported: toInsert.length });
 });
