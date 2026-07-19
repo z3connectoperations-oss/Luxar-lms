@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
-import { CheckCircle2, Lock, PlayCircle, FileText, X, ChevronRight, Download, Trash2 } from "lucide-react";
+import { CheckCircle2, Lock, PlayCircle, FileText, X, ChevronRight, Download, Trash2, Menu } from "lucide-react";
 import { api, lessonFileUrl } from "../../lib/api";
 import { cn } from "../../lib/cn";
 import { isSaved, saveLesson, getOfflineUrl, removeLesson } from "../../lib/offline";
@@ -29,6 +29,8 @@ export default function LearnPlayer() {
   const [data, setData] = useState<PlayerData | null>(null);
   const [activeId, setActiveId] = useState("");
   const [liveSessions, setLiveSessions] = useState<LiveSession[]>([]);
+  // Mobile: the Table of Content lives in a slide-out drawer.
+  const [tocOpen, setTocOpen] = useState(false);
 
   const load = useCallback(async () => {
     const d = await api<PlayerData>(`/learn/courses/${courseId}`);
@@ -132,16 +134,20 @@ export default function LearnPlayer() {
       {/* Solid black capture-shield (no text). */}
       {blackout && <div className="fixed inset-0 z-[60] bg-black" />}
       {/* Top bar */}
-      <header className="flex shrink-0 items-center justify-between border-b border-border bg-card px-5 py-2.5 text-ink">
-        <div className="flex items-center gap-2.5">
-          <img src="/luxaar.png" alt="" className="h-7 w-7 rounded-md object-cover ring-1 ring-ink/10" />
-          <div className="leading-tight">
+      <header className="flex shrink-0 items-center justify-between gap-2 border-b border-border bg-card px-3 py-2.5 text-ink sm:px-5">
+        <div className="flex min-w-0 items-center gap-2.5">
+          {/* Mobile: open the Table of Content drawer */}
+          <button onClick={() => setTocOpen(true)} className="grid h-9 w-9 shrink-0 place-items-center rounded-md text-ink hover:bg-canvas md:hidden" title="Course content" aria-label="Open course content">
+            <Menu size={20} />
+          </button>
+          <img src="/luxaar.png" alt="" className="hidden h-7 w-7 rounded-md object-cover ring-1 ring-ink/10 sm:block" />
+          <div className="min-w-0 leading-tight">
             <div className="text-sm font-semibold">Luxaar Institute</div>
-            <div className="text-[11px] text-muted">{data.course.title}</div>
+            <div className="truncate text-[11px] text-muted">{data.course.title}</div>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <span className="text-xs text-muted">{data.completedLessons}/{data.totalLessons} done · {data.progressPct}%</span>
+        <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+          <span className="whitespace-nowrap text-[11px] text-muted sm:text-xs">{data.completedLessons}/{data.totalLessons} · {data.progressPct}%</span>
           <button onClick={() => window.close()} className="grid h-8 w-8 place-items-center rounded-md text-muted hover:bg-canvas hover:text-ink" title="Close">
             <X size={18} />
           </button>
@@ -177,7 +183,7 @@ export default function LearnPlayer() {
                 <button
                   key={l.id}
                   disabled={!l.unlocked}
-                  onClick={() => l.unlocked && setActiveId(l.id)}
+                  onClick={() => { if (l.unlocked) { setActiveId(l.id); setTocOpen(false); } }}
                   className={cn(
                     "flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm transition",
                     isActive ? "bg-brand-50 font-semibold text-brand-700" : "text-ink hover:bg-canvas",
@@ -199,10 +205,22 @@ export default function LearnPlayer() {
         );
 
         return (
-      <div className="grid min-h-0 flex-1 grid-cols-[300px_1fr]">
-        {/* Table of contents — Subject → Module → Lesson */}
-        <aside className="flex flex-col overflow-y-auto border-r border-border bg-white">
-          <div className="border-b border-border px-4 py-3 text-sm font-bold text-ink">Table of Content</div>
+      <div className="relative grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[300px_1fr]">
+        {/* Mobile backdrop behind the TOC drawer */}
+        {tocOpen && <div className="fixed inset-0 z-40 bg-ink/40 md:hidden" onClick={() => setTocOpen(false)} />}
+        {/* Table of contents — Subject → Module → Lesson.
+            Mobile: fixed slide-out drawer; desktop: static left column. */}
+        <aside className={cn(
+          "fixed inset-y-0 left-0 z-50 flex w-80 max-w-[85vw] -translate-x-full flex-col overflow-y-auto border-r border-border bg-white transition-transform duration-200",
+          tocOpen && "translate-x-0",
+          "md:static md:z-auto md:w-auto md:max-w-none md:translate-x-0 md:transition-none"
+        )}>
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <span className="text-sm font-bold text-ink">Table of Content</span>
+            <button onClick={() => setTocOpen(false)} className="grid h-8 w-8 place-items-center rounded-md text-muted hover:bg-canvas hover:text-ink md:hidden" aria-label="Close course content">
+              <X size={17} />
+            </button>
+          </div>
           {groups
             ? groups.map((g) => {
                 const gLessons = g.modules.flatMap((m) => m.lessons);
@@ -226,7 +244,7 @@ export default function LearnPlayer() {
         </aside>
 
         {/* Content */}
-        <main className="min-w-0 overflow-y-auto p-5">
+        <main className="min-w-0 overflow-y-auto p-3 sm:p-5">
           {!active ? (
             <div className="grid h-full place-items-center text-muted">Select a lesson.</div>
           ) : !active.unlocked ? (
@@ -375,7 +393,7 @@ function LessonStage({ courseId, courseTitle, lesson, flat, reload, onGoNext }: 
       )}
 
       {/* Completion control */}
-      <div className="flex items-center justify-between rounded-xl border border-border bg-white px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-white px-4 py-3">
         {completed ? (
           <span className="inline-flex items-center gap-1 text-sm font-medium text-emerald-700"><CheckCircle2 size={16} /> Completed</span>
         ) : lesson.type === "video" ? (
